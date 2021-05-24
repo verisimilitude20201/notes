@@ -15,10 +15,10 @@ Video: https://www.youtube.com/watch?v=SqqrOspasag&list=PLQnljOFTspQUNnO4p00ua_C
 
 4. Reverse proxy client does'nt know the final destination. Proxy in this case communicates on the applications behalf to the server. Often used for load balancing
 
-                                                                                google-server-1 
-    
-    Client wishing to go to google.com ==> Reverse proxy (google.com) ==>
-                                                                                google-server-2
+                                                                                                                                                        google-server-1 
+        
+        Client wishing to go to google.com ==> Reverse proxy (google.com) ==>
+                                                                                    google-server-2
 
 5. Reverse proxy use-cases
     - Caching 
