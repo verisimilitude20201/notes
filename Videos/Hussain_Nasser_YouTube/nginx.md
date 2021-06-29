@@ -1,4 +1,4 @@
-Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjda8vd2jWJYt&index=2(15:00)
+Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjda8vd2jWJYt&index=2(34:12)
 
 # Nginx
 
@@ -27,3 +27,35 @@ Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjd
    a. Nginx can operate in layer 7 (http) or layer 4 (tcp)
    
    b. Stream context - TCP (layer 4 load balancing), Http context - Layer 7 load balancing
+
+## Sample NGinx Web configuration
+   1 http {
+      1 server {
+         1 listen 8080;
+         3 root /var/www/html;
+         4 location /images {
+            root /var/www/images;
+         }
+         5 location ~ .jpg$ {
+            return 403;
+         }
+      }
+
+      server {
+         listen 8888
+         location / {
+         6  proxy_pass http://localhost:8080/;
+         }
+      }
+   }
+
+   events {
+
+   }
+
+1. Block directives are http and server. listen is a leaf directive.
+2. Re-read Nginx config - `nginx -s reload` and then `nginx`
+3. Different websites with different content - just create different folders within /var/www/html
+4. To load images from a different directory at the same level of html folder. You cannot serve the whole images folder though.
+5. Match URLs with regular expressions.
+6. Redirect to http://localhost:8080 when someone tries to access http://localhost:8888. This is a redirection. Nginx is lazy loading, HAProxy is eager loading.
