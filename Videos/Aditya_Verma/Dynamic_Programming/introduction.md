@@ -4,7 +4,7 @@ Video: https://www.youtube.com/watch?v=nqowUJzG-iM&list=PL_z_8CaSLPWekqhdCPmFohn
 ## DP
   - Top Down approach is via a table
   - Dynamic programming is enhanced recursion. DP's parent is recursion.
-  - Function calls itself with smaller sets of inputs. It keeps on reducing the input by 1.
+  - Function calls itself with smaller sets of inputs. It keeps on reducing the input by 1. Say first call is from n. The calls at the second level of the tree are from n - 1 and n - 2
   - To avoid repeated calls, we construct the DP table.
 
 ## How to identify DP problems

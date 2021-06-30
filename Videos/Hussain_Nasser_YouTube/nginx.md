@@ -1,4 +1,4 @@
-Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjda8vd2jWJYt&index=2(34:12)
+Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjda8vd2jWJYt&index=2(50:00)
 
 # Nginx
 
@@ -47,6 +47,39 @@ Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjd
          6  proxy_pass http://localhost:8080/;
          }
       }
+      7 upstream allbackend {
+         8 ip_hash;
+         server 127.0.0.1:2222
+         server 127.0.0.1:3333
+         server 127.0.0.1:4444
+         server 127.0.0.1:5555
+      }
+
+      9 upstream app1backend {
+         server 127.0.0.1:2222
+         server 127.0.0.01:3333
+      }
+
+      9 upstream app2backend {
+         server 127.0.0.1:4444
+         server 127.0.0.1:5555
+      }
+
+      server {
+         listen 80;
+       7  location / {
+            proxy_pass http://allbackend;
+         }
+
+         9 location /app1 {
+            proxy_pass http://app1backend;
+         }
+
+         9 location /app2 {
+            proxy_pass http://app2backend;
+         }
+
+      }
    }
 
    events {
@@ -59,3 +92,7 @@ Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjd
 4. To load images from a different directory at the same level of html folder. You cannot serve the whole images folder though.
 5. Match URLs with regular expressions.
 6. Redirect to http://localhost:8080 when someone tries to access http://localhost:8888. This is a redirection. Nginx is lazy loading, HAProxy is eager loading.
+7. This load balances the request to 4 services running on 127.0.0.1 on ports 2222 to 5555.
+8. Consistent Hashing: This hashes the client IP address and maps it to one of the services. Every time a certain client sends a request, it gets mapped to the same server IP. This is useful for stateful sessions because it sticks a client request to one server. Idea of having a sticky state in memory is not useful especially in case of Kubernetes where containers keep coming up and down.
+9. Path based request routing.
+10. Block /admin connections
