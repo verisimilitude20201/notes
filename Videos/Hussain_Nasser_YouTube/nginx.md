@@ -1,4 +1,4 @@
-Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjda8vd2jWJYt&index=2(50:00)
+Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjda8vd2jWJYt&index=2(1:01:00)
 
 # Nginx
 
@@ -78,12 +78,28 @@ Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjd
          9 location /app2 {
             proxy_pass http://app2backend;
          }
+         10 location /admin {
+            return 403;
+         }
 
       }
    }
 
    events {
 
+   }
+
+   11 stream {
+      upstream allbackend {
+            server 127.0.0.1:2222
+            server 127.0.0.01:3333
+            server 127.0.0.1:4444
+            server 127.0.0.1:5555
+      }
+      server {
+         listen 80
+         proxy_pass http://allbackend;
+      }
    }
 
 1. Block directives are http and server. listen is a leaf directive.
@@ -96,3 +112,4 @@ Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjd
 8. Consistent Hashing: This hashes the client IP address and maps it to one of the services. Every time a certain client sends a request, it gets mapped to the same server IP. This is useful for stateful sessions because it sticks a client request to one server. Idea of having a sticky state in memory is not useful especially in case of Kubernetes where containers keep coming up and down.
 9. Path based request routing.
 10. Block /admin connections
+11. Layer 4 proxy configuration: No path-based routing. This leads to 5 TCP connections in the above example: 4 connections with the 4 backend servers and 1 connection with the client. Can use any protocol that supports TCP. Most of them when you refresh you are redirecting to the same server. Browser can decide to hit another server. If we would do that with Telnet, it will we will find that it's almost round-robin
