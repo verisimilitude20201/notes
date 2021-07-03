@@ -1,4 +1,4 @@
-Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjda8vd2jWJYt&index=2(1:01:00)
+Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjda8vd2jWJYt&index=2(1:35:03)
 
 # Nginx
 
@@ -113,3 +113,31 @@ Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjd
 9. Path based request routing.
 10. Block /admin connections
 11. Layer 4 proxy configuration: No path-based routing. This leads to 5 TCP connections in the above example: 4 connections with the 4 backend servers and 1 connection with the client. Can use any protocol that supports TCP. Most of them when you refresh you are redirecting to the same server. Browser can decide to hit another server. If we would do that with Telnet, it will we will find that it's almost round-robin
+
+
+## Hosting DNS to the public server, add cert
+1. Enable port forwarding on your router's public IP address to your internal computer/service's port 80/443.
+2. Create a hostname on noip.com that points to your public IP
+3. Use Let's encrypt certificate.
+  - Install Let's encrypt certbot
+  - Stop the nginx server
+  - Generate standalone certificate and private key. It'll ask for domain and username
+4. Configure nginx and enable TLS 1.3, http/2
+   
+         http {
+            server {
+               listen 80; 
+               listen 443 ssl http2;
+               ssl_certificate # Public Key PAth
+               ssl_certificate_key # Private key path
+               ssl_protocols TLSv1.3
+            }
+         }
+
+5. TLSv1.2 is slow and uses ancient ciphers. 
+
+
+## Nginx 6 timeouts
+1. client_header_timeout: The timeout on Nginx's side that waits for all of client's request headers to be transferred.
+2. client_body_timeout: The timeout on Nginx's side that waits for all of client's body  to be transferred. The client's body is split into packets and once one packet is received, the entire timeout gets reset. The body is actually large that's why.
+3. send_timeout: When nginx is about to send the response to the client. The server's response is split into packets and once the client receives a packet and acks it, the timer gets reset.If a packet takes more than 60 seconds to transfer, the connection is broken.
