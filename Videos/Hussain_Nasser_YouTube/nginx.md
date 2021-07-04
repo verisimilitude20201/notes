@@ -140,4 +140,14 @@ Video: https://www.youtube.com/watch?v=hcw-NjOh8r0&list=PLQnljOFTspQWdgYcGXCTkjd
 ## Nginx 6 timeouts
 1. client_header_timeout: The timeout on Nginx's side that waits for all of client's request headers to be transferred.
 2. client_body_timeout: The timeout on Nginx's side that waits for all of client's body  to be transferred. The client's body is split into packets and once one packet is received, the entire timeout gets reset. The body is actually large that's why.
-3. send_timeout: When nginx is about to send the response to the client. The server's response is split into packets and once the client receives a packet and acks it, the timer gets reset.If a packet takes more than 60 seconds to transfer, the connection is broken.
+3. send_timeout: When nginx is about to send the response to the client. The server's response is split into packets and once the client receives a packet and acks it, the timer gets reset.If a packet takes more than 60 seconds to transfer and client does'nt ack it within  60 seconds, the connection is broken.
+4. keepalive_timeout: Timeout after which an idle connection will be closed.
+5. lingering_timeout: When lingering_timeout is disabled, the connection will die immediately. If the client does'nt handle it gracefully, it leads to issues. When it's enabled, it starts a timeout when client requests a closure or server requests a closure. After the timer starts, it will get reset whenever a client tries to send a request. It can be used for cleaning up the data bytes in the socket.
+6. resolver_timeout: How long we need to wait for Nginx to resolve a DNS.
+
+## Nginx Backend timeout
+1. proxy_connect_timeout: Nginx starts and tries to connect with the upstream back-end servers. If Nginx cannot connect to the backend supposed to be in the same network within 60s, it closes the connection
+2. proxy_send_timeout: The time it takes for Nginx to send a request to the backend server. This is split into packets and if for a single packet the backend server doesn't ack within 60 seconds, the connection is closed.
+3. proxy_read_timeout: Nginx successfully sent the GET request to the server. Server starts sending the response made up of 3 packets. Nginx receives that packet and reads it and acks it and the timer is reset. The server transfer second packet. If any read operation takes more than 60 second when a packet is sent, this time out kicks in and Nginx closes the connection
+4. keepalive_timeout: Closes all idle connections beyond this timeout.Should be kept higher because establishing a connection is expensive.
+5. proxy_next_upstream_time: how long should be keep trying reaching upstream servers if any of the servers fail to accept a connection. After this timeout is reached, the NGinx responds with a 503 Service not available.
