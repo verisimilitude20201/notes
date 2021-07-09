@@ -12,3 +12,4 @@
    - Load balancer assembles response packets from the 3 back-ends and sends them to the client. If the load-balancer is a TLS-terminating proxy, it will decrypt the back-end response, assemble it and encrypt it and send it back to the client.
 
 3. If all is HTTP/2, a single TCP connection gets created between the back-end and a single server and all index.html, JS, CSS get sent as 3 separate streams within the same TCP connection with the same backend server.
+4. What if 
