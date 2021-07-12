@@ -1,6 +1,6 @@
 Video: https://www.youtube.com/watch?v=Q0irm6xzNNk (20:15)
 
-# Cloudfare's Unimog
+# Cloudfare's Unimog (Only includes chief features and concept)
 
 1. Reinvented what layer 4 load balancing is. 
 
@@ -18,3 +18,19 @@ Video: https://www.youtube.com/watch?v=Q0irm6xzNNk (20:15)
 
 
 ## Walk through an actual request path
+1. Request comes from Internet and goes to the router
+2. Router uses ECMP and redirects it to a particular server. It's received by the kernel layer. 
+3. This server says that this packet is for Virtual IP address and it's just one of us. So it takes care of redirecting this request to the actual direct IP of the appropriate server (by choosing an appropriate load balancing algorithm).
+4. This server encapsulates the TCP packet in another packet and forwards it to the appropriate server.
+5. This server processes the packet, sends it back to the source IP (virtual IP) to send it across the Internet.
+
+## XDP module
+1. XDP module at the kernel intercepts a packet received at the network interface passes it through a module that checks for DoS and drops right there if it is.
+2. After this, the packet passes to a Unimod module which forwards it to the systems's TCP stack. 
+3. If this packet is not for this machine, it queries the XDP control plane to find the destination IP to route the packet to.
+4. XDP control plane contains the routing information
+
+
+## Edge Computing
+1. Front-end to back-end servers containing load balancers and proxies.
+

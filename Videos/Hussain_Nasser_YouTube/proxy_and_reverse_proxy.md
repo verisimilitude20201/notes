@@ -3,13 +3,13 @@ Video: https://www.youtube.com/watch?v=SqqrOspasag&list=PLQnljOFTspQUNnO4p00ua_C
 # Proxy and Reverse Proxy
 
 
-1. Proxy makes requests on behalf of a client. Any request that goes out of the machine get established through the proxy. For example: I want to google.com via my-proxy.com.
+1. Proxy makes requests on behalf of a client. Any request that goes out of the machine get established through the proxy. For example: I want to google.com via my-proxy.com. Any request that goes out goes through the proxy.
 2. For google.com, the client is the proxy
 3. Use-cases 
    - ISPs use proxies to block unwanted websites. 
    - Organizations too use proxies to block unwanted content
    - Caching web content
-   - Anonymitity from the final destination
+   - Anonymitity from the final destination: Google.com knows only the proxy server's IP and not the IP.
    - Logging requests
    - Sidecar proxies used in Microservices and have it take care of networking stuff like upgrading the protocol to HTTP/2 or HTTP/3
 
@@ -34,4 +34,4 @@ Video: https://www.youtube.com/watch?v=SqqrOspasag&list=PLQnljOFTspQUNnO4p00ua_C
 
 8. Can I use proxy instead of VPN for anonymity: VPNs is more secure than proxy because at a lower level. Only thing that VPN can see in the content is the domains.TLS-terminating proxy can see everything.
 
-9. Is proxy for HTTP Proxy? No. There is SOCKS proxy, HTTP proxy, Streaming Proxy, TLS termination proxies and so on.
+9. Is proxy for HTTP Proxy? No. There is SOCKS proxy, HTTP proxy, Streaming Proxy, TLS termination proxies, Gopher proxy, FTP proxy, Streaming RTSP proxies and so on.
