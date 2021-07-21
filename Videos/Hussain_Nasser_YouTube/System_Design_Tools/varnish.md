@@ -1,4 +1,4 @@
-Video: https://www.youtube.com/watch?v=-cWs6eoyaLg(22:00)
+Video: https://www.youtube.com/watch?v=-cWs6eoyaLg(35:15)
 
 # Varnish - HTTP accelerator
 
@@ -17,3 +17,10 @@ Video: https://www.youtube.com/watch?v=-cWs6eoyaLg(22:00)
 5. Anything behnind Varnish is back-end and anything before Varnish is called front-end.
 6. To support HTTPS, you can use an Nginx before Varnish as a reverse proxy and use it as a TLS terminator. Or we can use a Caddy Web server.
 7. Varnish does not support HTTPS backend in the open source but it has a paid feature that supports HTTPS backends.
+
+## Varnish Pros
+1. Cache and prefetching documents work naturally (Developer responsible for caching in other caching systems like Redis). This can be a double-edged sword. That's why people prefer Redis, I want to cache stuff and invalidate cache my way.
+2. Resolves the DNS hostnames in the response content. It remembers the DNS's IP address.
+3. Rewrite scripts to optimize code. Like writing a JavaScript in an optimal way to give the same output.
+4. Load balancing. Only supports HTTP.
+5. Backend connection pooling. Varnish plus supports SSL.
