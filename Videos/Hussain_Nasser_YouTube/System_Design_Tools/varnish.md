@@ -1,4 +1,4 @@
-Video: https://www.youtube.com/watch?v=-cWs6eoyaLg(35:15)
+Video: https://www.youtube.com/watch?v=-cWs6eoyaLg
 
 # Varnish - HTTP accelerator
 
@@ -23,4 +23,14 @@ Video: https://www.youtube.com/watch?v=-cWs6eoyaLg(35:15)
 2. Resolves the DNS hostnames in the response content. It remembers the DNS's IP address.
 3. Rewrite scripts to optimize code. Like writing a JavaScript in an optimal way to give the same output.
 4. Load balancing. Only supports HTTP.
-5. Backend connection pooling. Varnish plus supports SSL.
+5. Backend connection pooling of TCP connections to the back-end. Max size of the connection pool is configurable.
+6. Varnish Modules: For example: Rewriting headers, add other headers, enable POST request caching
+7. Edge side includes: ESI markup language explicitely marks the dynamic content. Varnish caches the remaining page and explicitely fetches the dynamic content on the cached page.
+
+## Varnish Cons
+1. Cache invalidation algorithms are expensive and difficult to solve. Redis has more control over this.
+2. Only works on unencrypted versions. The open source version.
+3. For HTTP Front-end, terminate TLS so that you can unencrypted stuff to Varnish.
+4. HTTPS backends not supported in open source Varnish
+5. Can't cache POST requests. (e.g GraphQL queries). GraphQL sends a huge payload of a query so it uses POST only for normal queries. We can use a module to cache GraphQL POST requests. But it's difficult, how would we know what requests to cache? That's why people prefer Redis because it offers much more control over what should be cached and what should'nt
+6. Varnish does not support HTTP/2 very well. 
