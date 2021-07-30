@@ -1,4 +1,7 @@
-Video: https://www.youtube.com/watch?v=Y6Ev8GIlbxc(44:00)
+Video: 
+- https://www.youtube.com/watch?v=Y6Ev8GIlbxc
+- https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215265/
+- Currently watching https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215266/
 
 # Distributed Systems in One Lesson
 
@@ -8,7 +11,10 @@ Video: https://www.youtube.com/watch?v=Y6Ev8GIlbxc(44:00)
 2. Characteristics of a Distributed System
     - The computers have to operate concurrently.
     - The machines fail independently.
-    - The computers don't share a global clock
+    - The computers don't share a global clock. All actions are asynchronous
+          - Amazon.com Yes
+          - Cassandra Database Yes
+          - My Computer: No, because there is a single global clock. All work is done with synchronization with the clock whose operation is driven by rising and falling cycles of the quartz oscillator 
 
 3. Single-threaded versions of storage, computation and messaging things work on a grander scale. But once we start to distribute these things, things appear to get complicated.
 
@@ -88,4 +94,18 @@ Video: https://www.youtube.com/watch?v=Y6Ev8GIlbxc(44:00)
 5. As a consumer, we will just look at some part of that message and hash it, mod the number of partitions and write that to that partition. Within each partition things are ordered. Randomly and uniformly messages are assigned to a partition
 6. System-wide / topic-wide partitioning is lost. At the producer level, you can be smart to decide what part of the message should be hashed. Messages from the same host, same user will go ordered into the same partition. 
 7. Each partition act as independent computers acting indendently scaling the system
-8. We now have a message bus.
+8. We now have a message bus. Whatever events you write to a database. Tomorrow, we can do compute events.
+
+### Lambda architecture
+1. Events are there, and two parallel systems are there to process.
+2. One system processes the batch processing, long term storage and slow and complete.
+3. Second system does stream processsing to compute faster summaries.
+4. Forced the people to write the same code twice - batch processing and stream processing.
+
+### Streaming with Events
+1. Why not events be events and process them on the fly through a streaming processing framework?
+2. There is a Kafka cluster
+    - A set of Kafka message nodes forming the Kafka cluster
+    - Various services are attached to it. Certain services are doing analytics. Couple of databases also are there. Might have ES cluster, Hadoop cluster all doing different things based on the event bus.
+    - An event is propagated across all consumers. No coupling of any sort across consumers.
+3. It's possible to go from a single server relational paradigm to a distributed cassandra paradigm. Have to change mind about certain things - consistency, data modelling, 

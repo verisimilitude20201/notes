@@ -1,4 +1,4 @@
-Video: https://www.youtube.com/watch?v=l02UxPYRmCQ&list=PL_z_8CaSLPWekqhdCPmFohncHwz8TY2Go&index=2(06:00)
+Video: https://www.youtube.com/watch?v=l02UxPYRmCQ&list=PL_z_8CaSLPWekqhdCPmFohncHwz8TY2Go&index=2
 
 # 0/1 Knapsack
 
@@ -28,3 +28,8 @@ Video: https://www.youtube.com/watch?v=l02UxPYRmCQ&list=PL_z_8CaSLPWekqhdCPmFohn
 ## How to identify
 1. Choice: Each item can be included or cannot be included.
 2. Optimal: We need the maximum profit. 
+
+For solving a DP problem,
+1. First write a recursive solution
+2. Then memoize
+3. Then start writing a bottom-up solution.
