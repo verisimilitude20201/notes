@@ -12,7 +12,7 @@ Video: https://www.youtube.com/watch?v=nqowUJzG-iM&list=PL_z_8CaSLPWekqhdCPmFohn
   - We are always given a choice. For example: we are given a knapsack amd we can either include an element or not include it.
   - Overlapping problems: Two recursive calls.
 
-## First try to write a recursive solution, then memoize it. Then we can start with the top-down tabular approach. For top down, recursive solution is a must.
+## First try to write a recursive solution, then memoize it. Then we can start with the bottom-up tabular approach. For bottom-up, recursive solution is a must.
 
 
 

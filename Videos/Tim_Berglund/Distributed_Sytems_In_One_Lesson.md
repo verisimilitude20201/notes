@@ -1,7 +1,7 @@
 Video: 
 - https://www.youtube.com/watch?v=Y6Ev8GIlbxc
 - https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215265/
-- Currently watching https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215270/ (4:48)
+- Currently watching https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215272/ (1:13)
 
 # Distributed Systems in One Lesson
 
@@ -86,11 +86,60 @@ Video:
 
 
 ## CAP Theorem
-1. CAP theorem: Distributed database having 3 properties - Availability(Nodes are always available to serve requests), Consistency(When you read a value, that's the most recent version of the value written), Partition Tolerance(Nodes keep coming and going out form a network partition)
-2. Consider that two peple are working in a coffee shop writing a play script on two separate pieces of paper with each syncing with each other what to write. The coffee shop closes and they keep doing it over phone at home. Ultimately the battery dies and these two decide to separately write the script instead of syncing with each other. This is a network partition. The spouse comes and asks one of them how's the script going? This is what the CAP theorem is. That guy could say No to answering saying that would be unfair to my partner (Give up availability for consistency in the case of a network partition). Or that guy would say "Well, I have this script but I would need to confirm once with my partner (Give up consistency for availability in the case of a network partition)
+1. Keynote given by Eric Brewster in which he conjectured this for distributed databases. He was then working for Akaimai
+2. Was proved by certain researchers at MIT later.
+3. Defintions
+  - Consistency: When I read from a distributed database, I am always going to get the last update I wrote.
+  - Availaibility: When I ask I get a response. When I request my favorite coffee, I get it.
+  - Partition Tolerance: Some nodes can occassionally be cut off from the rest of the nodes. May be GC pauses, network configuration issues. When that happens, the database can deal with it and still service requests. And when the issue resolves the database entangles all mess that had happened.
+4. For a distributed system, P is not negotiable. Some part of the distributed system may independently. So for any failure we can just trade-off availaibility and consistency. For a single server database, life's good and u can have consistency and availaibility both.
+5. Example Scenario from a coffee shop: Consider that two peple are working in a coffee shop writing a play script on two separate pieces of paper with each syncing with each other what to write. The coffee shop closes and they keep doing it over phone at home. Ultimately the battery dies and these two decide to separately write the script instead of syncing with each other. This is a network partition. The spouse comes and asks one of them how's the script going? This is what the CAP theorem is. That guy could say No to answering saying that would be unfair to my partner (Give up availability for consistency in the case of a network partition). Or that guy would say "Well, I have this script but I would need to confirm once with my partner (Give up consistency for availability in the case of a network partition)
+6. This is just a set of constraints applied to a distributed system. A decade back one would'nt care about this - a single server database would be just fine.
 
+## Distributed Transactions
+1. ACID
+   - Atomic: Completes completely or does not at all. Bundle of SQL statements that executes together. Say my entire family wants to update their favorite drinks
+   - Consistent: When transaction completes, the database is in a valid state.
+   - Isolated: If a transaction is currently trying to update the family's favorite coffee drink flavors, another transaction comes in to read ABC's favorite drink, that transaction would still read the old value / block till the first transaction completes. 
+   - Durability: Database always remembers the things that we persist to it.
+2. Steps to order coffee in an ACID way
+   - Receive an order placed: I'd like a Cappuchino
+   - Process the payment based on my credit card.
+   - Order gets enqueued with the correlation identifier / may be order details too.
+   - Barista takes a cup from that queue, sees the order, makes the coffee
+   - Delivers the drink
+3. Why split the work?
+   - Parallelization: We can specialize people here. This will also avoid unnecessary burden on a single person to do all jobs. Having many people helps to service more customers.
+   - Uneven workloads: Certain drinks are getting longer to make than making the payment. We could assign workers to different chunks of work according to how much work needs to be done.
+4. What could go wrong: For ACID transactions, none of the below matters, the transaction is entirely undone
+   - Payment could fail
+   - Insufficient resources to make coffeee
+   - Equipment failure
+   - Worker failure even if I have paid for coffee
+   - Consumer failure: The barista accepting my order had to go somewhere else.
+
+5. Responses to failure
+   - Write-off: Work is done, work can no longer go on to next phase so throw it away
+   - Retry: The payment operation for example.
+   - Compensating action: Customer has paid but you are out of coffee, the machines is broke, you give the customer her money back.
+6. Questions
+   - How can we design a coffee ship with atomic transactions? 
+      o Have one barista per customer and he first prepares the coffee and then the customer can pay only pay if he has his coffee.
+      o The reason we don't do this is because it'll affect throughput, it'll slow you down, you'll loose customers.
+   - Why they give up on atomicity?
+      o Higher throughput, more customers
+
+7. It's possible using Zookeeper to create distributed transactions. Cassandra has light-weight transactions.
 
 ## Distributed Computation
+1. Lots of data scattered across lots and lots of computers and we use distributed computation to proces them
+2. Scatter-Gather
+  - Scatter a computation on many nodes where processing happens on local data and gather the results of those computation. 
+  - Data being local is the key.
+  - Move programs where the data is.
+3. MapReduce
+
+
 1. Single processor and single thread are pretty easy. Multi-threading within the same processor is terrible. 
 2. Multi-computer processing is even terrible. We have built several great tools to accomplish this. 
 
