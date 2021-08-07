@@ -134,14 +134,14 @@ Video:
 ## Distributed Computation
 1. Lots of data scattered across lots and lots of computers and we use distributed computation to proces them
 2. Scatter-Gather
+  - A General Paradigm for distributed computation
   - Scatter a computation on many nodes where processing happens on local data and gather the results of those computation. 
   - Data being local is the key.
   - Move programs where the data is.
-3. MapReduce
-
-
-1. Single processor and single thread are pretty easy. Multi-threading within the same processor is terrible. 
-2. Multi-computer processing is even terrible. We have built several great tools to accomplish this. 
+  - Distributed system, computers are connected over a real, fast network. Network may not be as fast as the connection between the processor and the connection between the disk. Inside a node, common clock, high-speed bus protocols are always higher bandwidth connections.
+3. MapReduce: Computational strategy that's it's implemented in Hadoop.
+4. Spark: Hadoop's competitor. Both data model and programming interface are entirely different.
+5. Storm: Oriented around event processing rather than processing data at rest. Real-time, small latency computation on incoming events rather than processing in batches. Use trade-offs to decide whether to use batch processing and event processing. Some people combine those forming lambda architectures to get best of both
 
 ### Map Reduce
 1. Consider we have a poem of 1800 words and we would need to do the word count. The answer is simple a wc command on the peom's text file.

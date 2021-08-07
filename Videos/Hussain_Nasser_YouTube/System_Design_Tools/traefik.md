@@ -1,4 +1,4 @@
-Video: https://www.youtube.com/watch?v=C6IL8tjwC5E&list=PLQnljOFTspQVMeBmWI2AhxULWEeo7AaMC&index=18 (31:00)
+Video: https://www.youtube.com/watch?v=C6IL8tjwC5E&list=PLQnljOFTspQVMeBmWI2AhxULWEeo7AaMC&index=18
 
 # Traefik - A reverse/forward proxy
 1. Open source reverse proxy written in Go and marketed as a an Edge router.
