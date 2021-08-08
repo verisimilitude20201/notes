@@ -1,7 +1,7 @@
 Video: 
 - https://www.youtube.com/watch?v=Y6Ev8GIlbxc
 - https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215265/
-- Currently watching https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215272/ (1:13)
+- Currently watching https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215274/ (4:00)
 
 # Distributed Systems in One Lesson
 
@@ -144,21 +144,58 @@ Video:
 5. Storm: Oriented around event processing rather than processing data at rest. Real-time, small latency computation on incoming events rather than processing in batches. Use trade-offs to decide whether to use batch processing and event processing. Some people combine those forming lambda architectures to get best of both
 
 ### Map Reduce
-1. Consider we have a poem of 1800 words and we would need to do the word count. The answer is simple a wc command on the peom's text file.
-2. MapReduce funnels all computation through 2 commands - one called Map and one called Reduce.
-3. Map function would tokenize this into words and split it into key value pairs of word and the number 1. I've seen each word a single time.
-4. Shuffling makes sure that similar key-value pairs are near by each other.
-5. Similar key-value pairs are dumped on the same reducer where they are added up
-6. MapReduce is good if you have a lot of data to process that's already stored on a distributed file-system. MapReduce is just a pattern for distributed computing and not a product. Hadoop is a product that implements this pattern. 
+1. Is a computational pattern. Mathematical abstraction that lends itself well to distributed computation by breaking the input data to pieces
+2. All computations done in two functions: Map and Reduce. Take an input and give an output. Everytime it's given the same input, it gives the same output.
+3. Keep data mostly local to where it is wherever it's possible.
+4. The goal is to bring the computation near data is.
+5. (Key, Value) -> Mapper -> [(K, V), (K, V)] (list of key-value pairs) -> Shuffle (Done by the framework we just provide the mapper and reducer) -> (K, [V1, V2, V2, V3]) (Find all common keys and all values from all the nodes) -> Reducer (Aggregation on all values) -> [(K, V), (K, V), (K, V)]
+6. Word-count:
+  - Consider we have a poem of 1800 words and we would need to do the word count.
+  - Mapper tokenizes the values i.e a bunch of words into key value pairs. Key will be word and value is 1. In a very good way, we split up this problem of seeing a word and counting how many times it is seen amongst a bunch of servers.
+  - Poem is only a few bytes, we can just execute a simple wc command against it to get the counts.
+  - Shuffle is going to move around the values such that all same values are at one place. Copying will move data across nodes so we take a hit on computation to ensure data locality
+  - Reducers can take those lists and can do the adding and give the final output. Even the reducers can be parallelized across nodes.
+7. MapReduce is good if you have a lot of data to process that's already stored on a distributed file-system. MapReduce is just a pattern for distributed computing and not a product. Hadoop is a product that implements this pattern. 
 
 ### Hadoop
 1. Fundamentals of Hadoop
- - MapReduce APIs
- - MapReduce job management
- - Distributed filesystem
- - Enormous eco-system
-2. Of these, the one long live piece of infrastructure that's still in active use is HDFS
-3. Hadoop spawned an enormous ecosystem that became complicated. The underlying programming model was terrible so we needed this pleasant eco-system on top of it. Things like Hive which made it relatively pleasant to use Hadoop. Spark has taken up much of MapReduce's market share
+ - MapReduce APIs: Interfaces for mappers and reducers, allows submiting functions to machines in a cluster and query for status
+ - MapReduce job management: Hands of mappers to nodes, retries failed mappers on different replicas.
+ - Distributed filesystem: Hadoop distributed file system (HDFS)
+ - Enormous eco-system: Many open source projects mushroomed around it. Writing raw mappers and reducers is complex we need friendlier interface to build them. Some tools are HBase (Column family database on top of HDFS), Hive(SQL like database), Oozie (job tracker/task tracker), Zookeeper, Mahout (machine learning system atop Hadoop), Scoop (interfaces SQL database to Hadoop), Cascading (Simplifies writing MapReduce APIs and functions). The reasons of this rich eco-systems is the complexity of writing a low-level MapReduce function and the popularity of this framework.
+2. HDFS: 
+  - Stores files and directories.
+  - Looks like a file-systems. Has a root. 
+  - Single replicated master that does single meta-data management. The file paths, location of individual blocks of files all in-memory. That is called NameNode.
+  - Limited. Hadoop is written in Java. Need to give a maximum Heap Size - 8 GB, 16 GB beyond that operations guys get a little bit nervous. There is a limit of 60 million objects for a 16 GB heap.
+  - Files are stored in large, immutable, replicated blocks (4K or 16K current default is 128 MB) on many boxes. 
+  - Immutability makes life so easier. We can only create a new block or delete it. We cannot change or modify it in any way.
+3. Architecture of HDFS:
+  - One NameNode to store metadata
+  - One or more DataNodes that hold actual data on HDFS
+  - Client app asks NameNode for a DataNode. NameNode says go to DataNode 3 and store there.
+  - NameNode changes are low band-width and less frequent. Farm of client apps can each have their own data node. Aggregate I/O performance of the system is a function of the network architecture and we can get away with disk latency.
+  - Assumes a large chunk of data gets stored at a time, it's not a transactional flow of purchase records. Gets there and stays there.
+  - NameNode coordinates the replication of blocks. DataNodes on going down can contact the NameNode to get the status of what it missed to repair the status of the cluster.
+4. How computation gets distributed?
+  - Job Tracker is the main compute node. It may or may not be the same as the NameNode.
+  - Data Nodes are the same.
+  - Client app submits a job to the Job tracker. Job is a Map + Reduce. Most commonly a JAR file (YARN job, many other ways of submitting a job)
+  - Job tracker sends the mapper code to a Task Tracker process running on each Data Node. Move compute to where the data is.
+  - Mapper stores it's output key value pairs on the same data node where it runs.
+  - Shuffler runs on the mapper output and the key value pairs will be moved about on the data nodes.
+  - Reducer code then runs on the shuffled output of the map phase and ultimately writes the final output on the file system.
+5. Rich Job management APIs.
+6. Real World Hadoop
+   - Top level Apache project
+   - Cloudera, HortonWorks makes packaged versions of Hadoop.
+   - Nobody writes Map/Reduce functions. Operate at a higher level of abstraction.
+   - Hive (SQL like interface). Constraints the data structure, introduce schema
+   - Integrate with BI front-ends and reporting tools, things can be used by business analysts
+7. When to use Hadoop
+   - Has to be a distributed systems problem, data volume is large
+   - Data velocity (Writes are low) is low. Transactional workloads are not a hadoop usecase. HBase can make sense here. 
+   - Latency SLAs are not aggresive. Running sorting in trillion size arrray is fast. But this is always Batch mode processing. Stream processing is not a Hadoop use-case
 
 ### Spark
 1. Scatter/Gather paradigm (similar to MapReduce). Instead of map, we have transform and instead of reduce, we have action.
