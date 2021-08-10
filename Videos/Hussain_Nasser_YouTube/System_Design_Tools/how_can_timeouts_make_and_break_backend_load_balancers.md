@@ -15,4 +15,9 @@ Video: https://www.youtube.com/watch?v=uNjACLXoH5A&list=PLQnljOFTspQVMeBmWI2AhxU
 ## Back-end aspects of timeouts.
 1. Proxy calls a fleet of back-end servers to service the request. Which server to hit depends on the load balancing algorithm.
 2. We must have pre-heated / pre-genarated TCP connection for each back-end server.
-3. What if the server does'nt respond to the TCP SYN-SYN-ACK? That's one timeout we can configure on the proxy's end. How long should the client as a proxy wait? 
+3. What if the server does'nt respond to the TCP SYN-SYN-ACK? That's one timeout we can configure on the proxy's end. How long should the client as a proxy wait? Taste different times to complete the back-end request. This is the server_timeout
+
+
+## Nginx / HAProxy
+1. Ngnix provides fine-grained controls over timeouts. Has separate timeouts for http headers / http body. This complicates stuff because Nginx documentation says just one line about everything
+2. HAProxy is definitely good in terms of documentation and supports use-cases for every configuration and timeout. 

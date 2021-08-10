@@ -198,11 +198,17 @@ Video:
    - Latency SLAs are not aggresive. Running sorting in trillion size arrray is fast. But this is always Batch mode processing. Stream processing is not a Hadoop use-case
 
 ### Spark
-1. Scatter/Gather paradigm (similar to MapReduce). Instead of map, we have transform and instead of reduce, we have action.
+1. Scatter/Gather paradigm (similar to MapReduce). Fairly different programming model and a flexible data model. Instead of map, we have transform and instead of reduce, we have action.
 2. Bunch of data sitting out on a bunch of computers and programs actually going to visit that data and locally run the computation. 
 3. Spark creates an abstraction on top of our data (RDD/DataSets) that's a part of the API. Spark gave you an object that you can program and you can call methods on that object
-4. More general programming model - transform and action.
+4. More general programming model - transform and action. Little more freedom and richer APIs.
 5. No storage opinions it's storage agnostic - HDFS, S3, Parque and the list goes.
+
+### Storm
+1. Both Hadoop and Spark are similar. There's a data at rest, computing goes to it and processes it. Spark also has a Streaming part to it.
+2. Storm is designed for data that's in motion. Complete stream processing from first to last.
+3. Storm is a stream processing engine that in near-realtime processes events. 
+4. Friendlier programming model than message passing.
 
 ### Kafka
 1. Approach to distributed computation in which everything is a stream. Data is inflight, you have not put data somewhere and send computational functions to it.
