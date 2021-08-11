@@ -1,7 +1,7 @@
 Video: 
 - https://www.youtube.com/watch?v=Y6Ev8GIlbxc
 - https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215265/
-- Currently watching https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215274/ (4:00)
+- Currently watching https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215276/ (8:30)
 
 # Distributed Systems in One Lesson
 
@@ -200,15 +200,63 @@ Video:
 ### Spark
 1. Scatter/Gather paradigm (similar to MapReduce). Fairly different programming model and a flexible data model. Instead of map, we have transform and instead of reduce, we have action.
 2. Bunch of data sitting out on a bunch of computers and programs actually going to visit that data and locally run the computation. 
-3. Spark creates an abstraction on top of our data (RDD/DataSets) that's a part of the API. Spark gave you an object that you can program and you can call methods on that object
-4. More general programming model - transform and action. Little more freedom and richer APIs.
-5. No storage opinions it's storage agnostic - HDFS, S3, Parque and the list goes.
+3. Spark creates an abstraction on top of our data (Resilient Distributed DataSets - RDDs: Clump data into pieces that the framework is able to derive from) that's a part of the API. Hadoop has several data models due to it's complexity. Spark gave you an object that you can program and you can call methods on that object
+4. More general programming model - transform and action. More freedom and richer APIs. Common utility functins
+5. No storage opinions it's storage agnostic - HDFS, S3, Parque, Cassandra(Models data according to queries) and the list goes. Hadoop comes with HDFS.
+
+### Spark Architecture
+1. Spark client runs out of the cluster to create a job to submit to the cluster. It creates a Spark Context while submitting a job.
+2. Spark Context involves a connection to a Spark node and the ability to perform the basic operations of the APIs, to create RDDs, run basic operations.
+3. Spark context creates a job and hands that job off to a cluster manager in a Spark cluster (can be a Cassandra cluster running Spark on top of Cassandra, a powerful combination for analytical workload).
+4. Job consists of a set of operations on clumps of data. These are transformation and actions peformed on RDDs.
+5. Cluster manager has an idea of which nodes a given data is and it takes care of executing the jobs on that specific node. This is similar to Hadoop and we can draw many parallels.
+6. Inside a worker node, we have an executor that's running in it's own JVM that listens to the cluster manager to receive tasks. These are serialized as JAR and deserialized as a task on the worker and executed.
+7. Spark loves to cache and figuring out what (hot) data to cache is a key part of optimizing the computation and performance. 
+8. Inside the executor each task processes data local to the node and in-memory.
+9. RDD: 
+  - Dataset that does'nt fit on one computer. 
+  - It's split up among multiple computers. It can be created from an input source (Say Log source, text file, Cassandra table). 
+  - Can also be the output from a function either by filtering, mapping, transforming another dataset. RDDs are immutable. 
+  - Intermediary RDDs are garbage collected. All transformations are functional.
+  - They have data-types
+  - Ordered and sortable
+  - Lazily evaluated. 
+  - Partitioned: Need to have a way where this chunk of RDD goes on server 1, this goes on server 2. By default the partitions are random hash, but they are often pluggable.
+  - Collection of things
+10. The way it gets stored Spark does not have not have any opinion. 
+11. We have a Cassandra database that stores people's favorite drink. We want the favorite drinks of people who ordered coffee on Friday after 3:00 PM. Cassandra does not natively answer this query. We can write a Spark job around that stores such data back into Cassandra so that we can read it quickly.
+12. Example: RDD of credit card purchases, the keys are the credit card numbers and the values are a list of transaction IDs. We can hash these keys mod the number of partitions. We can determine the actual partition from  the bank code as well so as to group all transactions from the same bank in the same partition
+13. Spark API
+   - Transformation function (filter, flatMap, distinct, group by) transforms one RDD into another. 
+   - Actions (count, collect, reduce) functions mostly aggregate functions
 
 ### Storm
-1. Both Hadoop and Spark are similar. There's a data at rest, computing goes to it and processes it. Spark also has a Streaming part to it.
+1. Both Hadoop and Spark are similar. They are batch mode processing frameworks. There's a data at rest, computing goes to it and processes it. Spark also has a Streaming part to it.
 2. Storm is designed for data that's in motion. Complete stream processing from first to last.
-3. Storm is a stream processing engine that in near-realtime processes events. 
-4. Friendlier programming model than message passing.
+
+#### Storm Goals
+1. Storm is a stream processing engine that in near-realtime processes events. 
+2. Friendlier programming model than mere message passing. Messaging model may not be suited to complex event processing.
+5. Storm guarantees at-least once processing semantics. This is a distributed system so things can fail, nodes can fail. Storm is willing to get the work done twice rather than not getting done at all due to distributed system failures.
+6. Horizontally scalable and fault tolerant
+7. Low-latency and fast answers on massive scale data. Storm came up from a project at Twitter firehose that used to do trending analysis and URL analysis.
+
+#### Storm Programming Model
+1. Basic definitions
+   - Stream: Sequence of tuples (collections of key-value pairs) coming real fast
+   - Spout is a source of streams. Points of integration. 
+   - Bolt: Accepts a functions to a stream and produces one or more output streams
+   - Topology: Graph of spouts and bolts. An actual job that runs indefinitely. Can be handed off to a cluster.
+2. Assume the coffee shop has scaled nation-wide. We have two Spouts producing different event streams
+   - Point-of-sale Spout: Generates the sale stream of coffee from different states and cities for the shop
+   - Click Stream Spout: Generates a stream of activity of what people actually do on the coffee shop's web and mobile app.
+   - These two streams are given as input to a bolt that transforms them and produces an output stream. 
+   - This forms a topology and this is how Spouts, streams, bolts and graphs fit together.
+   - This topology is handed off to the cluster.
+3. Architectural components
+   - Nimbus: Central node to which we give a topology to run. Just like NameNode of Hadoop.
+   - That node coordinates with a Zookeeper cluster which helps with coordination, centralized naming. 
+   - Supervisor nodes take information about what to do from the Zookeeper cluster and Nimbus master supervises the entire thing.
 
 ### Kafka
 1. Approach to distributed computation in which everything is a stream. Data is inflight, you have not put data somewhere and send computational functions to it.
