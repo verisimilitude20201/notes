@@ -1,7 +1,7 @@
 Video: 
 - https://www.youtube.com/watch?v=Y6Ev8GIlbxc
 - https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215265/
-- Currently watching https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215276/ (8:30)
+- Currently watching https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215277/ (5:00)
 
 # Distributed Systems in One Lesson
 
@@ -245,7 +245,7 @@ Video:
 1. Basic definitions
    - Stream: Sequence of tuples (collections of key-value pairs) coming real fast
    - Spout is a source of streams. Points of integration. 
-   - Bolt: Accepts a functions to a stream and produces one or more output streams
+   - Bolt: Applies  functions to an incoming stream and produces one or more output streams
    - Topology: Graph of spouts and bolts. An actual job that runs indefinitely. Can be handed off to a cluster.
 2. Assume the coffee shop has scaled nation-wide. We have two Spouts producing different event streams
    - Point-of-sale Spout: Generates the sale stream of coffee from different states and cities for the shop
@@ -257,6 +257,41 @@ Video:
    - Nimbus: Central node to which we give a topology to run. Just like NameNode of Hadoop.
    - That node coordinates with a Zookeeper cluster which helps with coordination, centralized naming. 
    - Supervisor nodes take information about what to do from the Zookeeper cluster and Nimbus master supervises the entire thing.
+4. Terminologies
+   - Nimbus: Central Coordinator of jobs
+   - Supervisor: Node that performs processing
+   - Task: A Bolt or spout of execution
+   - Worker: JVM process where a topology executes. A worker executes multiple tasks where each task is a partitioned bolt or spout on the stream of data.
+5. Stream Grouping: 
+   - Assigns tuples to tasks through a consistent hashing mechanism
+   - Shuffle Grouping: Random assignments. No logical reasoning or affinity
+   - Fields Grouping: mod hash of subset of tuple fields.
+   - All Grouping: Broadcast to every task
+   - Getting partitioning right is the key to performance.
+
+   
+### Lambda architecture
+0. Best of both worlds - Stream processing and batch processing
+1. Events are there, and two parallel systems are there to process.
+2. One system processes the batch processing, long term storage and slow and complete.
+3. Second system does stream processsing to compute faster summaries.
+4. Forced the people to write the same code twice - batch processing and stream processing.
+5. Features
+   - System input is an event stream.
+   - Events are immutable. Once event happens, it cannot un-happen.
+   - Batch and stream processing are functional. Pure functions. Transforms events into another form.
+
+#### Problems
+1. Very high rate of events
+2. Must remember and must store and interpret. Lots of Point Of Sale data from the large retail chain.
+3. Wrong answer fast and right answer slow: We are willing to tolerance imprecise data at a ridiculously lower latency. May be the precise answer takes 15 minutes to compute but we also need a good enough answer.
+
+#### Lamba components
+1. Big Data Store: Stream of events that goes to a resting place (Cassandra DB, any other NoSQL DB). Long term storage, batch processing and slow and accurate.
+2. Append only distributed queue: Same stream comes to an event processing framework. May give us temporary queuing, fundamentally stream processing. We never put the event at rest, we process it and moves ahead. It's fast and wrong. Willing to make compromises.
+3. Same input stream -> two different pipelines.
+
+
 
 ### Kafka
 1. Approach to distributed computation in which everything is a stream. Data is inflight, you have not put data somewhere and send computational functions to it.
@@ -286,11 +321,7 @@ Video:
 7. Each partition act as independent computers acting indendently scaling the system
 8. We now have a message bus. Whatever events you write to a database. Tomorrow, we can do compute events.
 
-### Lambda architecture
-1. Events are there, and two parallel systems are there to process.
-2. One system processes the batch processing, long term storage and slow and complete.
-3. Second system does stream processsing to compute faster summaries.
-4. Forced the people to write the same code twice - batch processing and stream processing.
+
 
 ### Streaming with Events
 1. Why not events be events and process them on the fly through a streaming processing framework?
