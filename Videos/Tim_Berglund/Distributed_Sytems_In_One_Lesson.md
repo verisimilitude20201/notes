@@ -280,6 +280,7 @@ Video:
    - System input is an event stream.
    - Events are immutable. Once event happens, it cannot un-happen.
    - Batch and stream processing are functional. Pure functions. Transforms events into another form.
+   - Data is dumped into a database or data warehouse.
 
 #### Problems
 1. Very high rate of events
@@ -291,7 +292,15 @@ Video:
 2. Append only distributed queue: Same stream comes to an event processing framework. May give us temporary queuing, fundamentally stream processing. We never put the event at rest, we process it and moves ahead. It's fast and wrong. Willing to make compromises.
 3. Same input stream -> two different pipelines.
 
+#### Why call it lambda? 
+1. Named after lambda calculus (Alonzo Church) because it does functional transformations on immutable data data.
 
+
+### Synchronization - What problems arise when we attempt to synchronize async nodes.
+1. "Now" in a distributed systems problematic. They don't have a shared clock.
+2. Why synchronization may matter?
+  - If we have 10 replicas, there can be 2 replicas that agree on a value and 2 replicas don't
+  - We can estimate the time and let last write win. Store a timestamp with every record.It requires us to have an idea of what time it is. We can put a GPS in every server. We can install NTP in every node
 
 ### Kafka
 1. Approach to distributed computation in which everything is a stream. Data is inflight, you have not put data somewhere and send computational functions to it.
