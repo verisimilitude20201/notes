@@ -301,6 +301,57 @@ Video:
 2. Why synchronization may matter?
   - If we have 10 replicas, there can be 2 replicas that agree on a value and 2 replicas don't
   - We can estimate the time and let last write win. Store a timestamp with every record.It requires us to have an idea of what time it is. We can put a GPS in every server. We can install NTP in every node
+  - Derive time logically - vector clocks. They don't tell us when, they just tell us in what order the writes happened.
+
+### Synchronization - Network Time Protocol(NTP)
+1. We put a very accurate clock (GPS receiver, atomic clock) on the Internet.
+2. The network latency is variable depending on the conditions of the network. We can have a 10ns on the precision clock and 100ms latency on the network
+3. NTP measures and accounts  for latency from the time it has measured.
+4. It uses layers of time servers also called strata.
+    - Stratum 0: Atomic or GPS reference clock having +-10ns accuracy
+    - Stratum 1: server attached to the stratum 0 clock having +-5ms accuracy.The server is Internet accessible and it has some sort of device interface that makes it read from the stratum 0 clock. We get small numbers of micro-seconds of jitter on that interface.
+    - Stratum 2: Syncs to stratum 1 having +- 10 ms. Could be in the same rack and has variable latency.Can also be in a different data center.
+    - Stratum 3: syncs to stratum 2 (+-10ms)
+    - Stratum 15: syncs to stratum 14 (+-10ms)
+5. 15 Strata are fairly uncommon. Upto 3 is fine. We can fan-out servers at each strata
+6. Protocol listens to port 123.
+7. 64 Bit timestamp - 32 Bit seconds since the epoch and 32 bits fractional seconds. Only till Year 2036.
+8. How NTP calculates time
+     Delta = (t3 - t0) - (t2 - t1) where
+     
+     t3 = client receive timestamp
+     t0 = client transmit timestamp thinking what it thinks the time was
+     (t3 - t0) round trip time
+
+     t2 = server transmit timestamp
+     t1 = server receive timestamp
+
+     Delta is the actual processing time to process the request.
+     We have to do this repeatedly to get a pretty good idea of what time it is.
+9. Good article - There is no Now. The very idea of now is illusive in distributed systems.
+
+### Synchronization - Vector Clocks
+1. NTP does a great job of telling us the time in +-10ms. Operationally trivial, ubiquitous and getting our nodes on the same page.
+2. We need time because we need to know sequence. Vector clocks give us an idea about the sequence. Sequence of Modifications of a mutable value in a database. Vector clocks don't tell time
+3. Assume that we are concurrently modifying one value. Multiple actors are contending to modify the value. Every actor has an ID. Every actor has a sequence numbers. Not a distributed counter, a single master counter.
+4. Riak uses vector clocks to resolve conflicting writes
+5. Understanding vector clocks by example of coffee shop 
+- Four friends - Alice, Bob, Cathy and Dave and trying to figure out a day to meet for coffee. 
+- Alice says Wednesday and attaches her ID and sequence number 1. Wednesday[(A, 1)]
+- Alice and Cathy are off somewhere and Bob and Dave are together. May be a network partition
+- Bob adds B: 1 and retains Alice's sequence number in the sequence Tuesday[(A, 1), (B, 1)]. Bob does'nt know Alice's sequence counter. He does'nt know if Alice used any other counter and those writes got lost. Bob says Tuesday. This is a descendant of Alice's write, a subsequent.
+- Dave says "yes Tuesday" and adds his own ID and sequence number to the vector clock. Tuesday[(A, 1), (B, 1), (D, 1)]
+- Network partition resolves and Cathy comes back. She says Thursday and appends her sequence number to the vector clock Thursday [(A, 1), (C, 1)]
+- Dave receives this and detects a conflict. He thought it was Tuesday [(A, 1), (B, 1), (D, 1)] but now it's Thursday[(A, 1), (C, 1)]. There's no way the Tuesday write could descend from the Thursday write. We have to find all components of [(A, 1), (C, 1)] in [(A, 1), (B, 1), (D, 1)] to consider the write a descendant.
+- Dave adds his own name to [(A, 1), (C, 1), (D, 2)]. We increment the sequence number by 1 for Dave since this is his second write. Furthermore, B's write will also be a part of this [(A, 1), (B, 1), (C, 1), (D, 2)]
+- Application needs to resolve the conflict here
+- Now Dave steps out and Alice asks Bob (Tuesday[(A, 1), (B, 1), (D, 1)]) and Cathy[Thursday(A, 1), (B, 1), (C, 1), (D, 1)] for their opinions. Bob did'nt get Dave's last message. Now Alice has a conflict
+- Tuesday[(A, 1), (B, 1), (D, 1)] & Thursday[(A, 1), (B, 1), (C, 1), (D, 2)]. Everything in Tuesday's vector clock is in Thursday's vector clock Thursday[(A, 1), (B, 1), (C, 1), (D, 2)]. So Thursday it is.
+6. Tradeoffs and Cons
+  - Unless the sequence is broken, they cannot get the sequence wrong. Last Writes Win can, they have a little window to get the sequence wrong. This LWW con is not a big deal in case there is'nt precise timing requirements.
+  - Push the complexity to the client i.e the application. Again this is of no significance if we don't need a precise time. For eg Trading systems. But for ordering systems and all that's okay.
+7. Great article - Why vector clocks are easy.
+8. Great article - Why cassandra does'nt needs vector clocks.
 
 ### Kafka
 1. Approach to distributed computation in which everything is a stream. Data is inflight, you have not put data somewhere and send computational functions to it.
