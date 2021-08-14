@@ -1,7 +1,7 @@
 Video: 
 - https://www.youtube.com/watch?v=Y6Ev8GIlbxc
 - https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215265/
-- Currently watching https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215277/ (5:00)
+- Currently watching Distributed Paxos
 
 # Distributed Systems in One Lesson
 
