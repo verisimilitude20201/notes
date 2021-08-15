@@ -1,7 +1,7 @@
 Video: 
 - https://www.youtube.com/watch?v=Y6Ev8GIlbxc
 - https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215265/
-- Currently watching Distributed Paxos
+- Currently watching Distributed Messaging https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215283/
 
 # Distributed Systems in One Lesson
 
@@ -353,40 +353,74 @@ Video:
 7. Great article - Why vector clocks are easy.
 8. Great article - Why cassandra does'nt needs vector clocks.
 
-### Kafka
-1. Approach to distributed computation in which everything is a stream. Data is inflight, you have not put data somewhere and send computational functions to it.
-2. Stream processing framework. Streams and stream only and also tables sometimes
-3. No cluster required
+## Distributed Consensus - Paxos
+1. Difficult to know when multiple nodes agree on something especially when some of them fail.
+2. We want agreement between concurrent, asynchronous and failure-prone processes on a mutable state.
+3. Any consensus algorithm must meet 4 common requirements
+   - Termination: Every process must eventually decide a value
+   - Validity: If all processes propose a value, all processes decide that same value.
+   - Integrity: If a process decides on a value, then that value should have been proposed by another process
+   - Agreement: Eventually all processes should agree on a value.
 
-## Distributed Messaging
-1. Means of loosely coupling subsystems. 
-2. Release independent functionalities and versioned also indepedently with the means to communicate between them by messaging (Microservicese)
-3. Messages are consumed by subscribers. Created by one or more producers organized into topics. Processed by brokers. Persistent over short term. Kafka defines it's own retention period for data. Consumers read the messages at each own rate
-4. Microservices are super-good approach and people struggle to get these to talk. 
-5. If the data is big that one computer, read/write is too for for one computer, topic becomes big due to a data retention period, guaranteed delivery even when a computer is down?
+### Paxos
+1. Paper was published by Leslie lamport in 2000
+2. Deterministic, fault-tolerant consensus protocol
+3. Named after a Greek island and voting process there he has this kind of fun evocative example of people voting on that island and there being uncertainty about whether votes were sent or received and so forth. And the islanders conceive this mechanism of making sure the votes get through
+4. Used when replicating durable, mutable state. When you are changing something and replicating it around a cluster, Paxos is used to guarantee a  consistent result.
 
-### Apache Kafka
-1. Single server messaging systems can do wonderful things including ensuring messages are delivered exactly once and order. It cannot guarantee resiliency and scalability if the data load grows. As the scale grows, you might need to have trade-off amoungst one of these things.
-2. Definitions
-   - Message: An immutable array of bytes
-   - Broker: One computer that the Kafka cluster is made up of.
-   - Topic: Feed of messages
-   - Consumer: Single threaded process subscribing to a topic.
-   - Producer: A process that publishes messages to a topic.
+#### Paxos Read
+One client and 3 nodes. Client could be another node in the cluster doing another read.
+1. Client does a read on a key and gets "Ristretto" from all nodes. Since all nodes agree on Ristretto, the client gets Ristretto
+2. If two nodes propose Ristretto and one proposes Triple Skinny, the majority is again Ristretto. 
+3. If all 3 nodes propose different values, it's a failure.
 
-3. Producer-Broker(Topic)-Consumer - A pipe based architecture
-4. When a topic gets big, we split that across into partitions 0, 1 and 2 replicated on each computer.
-5. As a consumer, we will just look at some part of that message and hash it, mod the number of partitions and write that to that partition. Within each partition things are ordered. Randomly and uniformly messages are assigned to a partition
-6. System-wide / topic-wide partitioning is lost. At the producer level, you can be smart to decide what part of the message should be hashed. Messages from the same host, same user will go ordered into the same partition. 
-7. Each partition act as independent computers acting indendently scaling the system
-8. We now have a message bus. Whatever events you write to a database. Tomorrow, we can do compute events.
+#### Paxos Write - Happy Path
+One coordinator node and 3 nodes. Coordinator node handles the writes.
+1. Prepare Phase
+   - Coordinator node is instructed to write "Flat White" to all replicas. 
+   - Coordinator (also called a Proposer) generates a sequence number to be sent along with "Flat White"
+   - This is forwarded to all replicas
+   - Sequence number has to be sortable and unique cluster wide. It could be timeUUID, few bits can be node_id and so on.
+   - Coordinator is working as a single master.
+2. Promise Phase:
+   - Nodes play the role of acceptor.
+   - Nodes accept the value if the sequence number is the highest one they've seen yet.
+   - They compare sequence numbers and they don't accept any writes with a lower sequence number.
+   - They return a sequence number they are not willing to go below and a value that they have promised to write.
+3. Accept Phase
+ - Proposer needs a quorum of promise requests to makes a decision.
+ - Proposer once again sends the same sequence number and value "Flat White" to all replicas
+ - Acceptors check sequence numbers one more time to check if anyone else got in between.
+ - If no one else got in between they write "Flat white" with the sequence number
+4. Acceptance Phase: The 3 acceptances come to the coordinator who then indicates to the client that the process is complete.
 
+#### Paxos Write - Better Path
+One coordinator node and 3 nodes. Coordinator node handles the writes.
+1. Prepare Phase: 
+   - Coordinator node wants to write a Cafe Cubano with sequence number 5 to all nodes.
+   - This is sent to all nodes.
+   - One of the acceptors has got another proposal with sequence number 8 with value "French Press".
+2. Promise Phase
+   - So two of the nodes promise 5: Cafe Cubano and one node says 8: French Press 
 
+3. Accept Phase
+   - Coordinator then realizes that there is something better 8: French Press (even though there's a quorum on 5: Cafe Cubano)
+   - It sends 8: French Press to all nodes. 
+   - Since all acceptors accept any value with a sequence number higher than 5, they accept and write French Press. Two nodes were surprised but they're fine with that since the sequence number is higher than 5.
 
-### Streaming with Events
-1. Why not events be events and process them on the fly through a streaming processing framework?
-2. There is a Kafka cluster
-    - A set of Kafka message nodes forming the Kafka cluster
-    - Various services are attached to it. Certain services are doing analytics. Couple of databases also are there. Might have ES cluster, Hadoop cluster all doing different things based on the event bus.
-    - An event is propagated across all consumers. No coupling of any sort across consumers.
-3. It's possible to go from a single server relational paradigm to a distributed cassandra paradigm. Have to change mind about certain things - consistency, data modelling, 
+4. Acceptance Phase: Is communicated to the proposer which then sends a success to client.
+
+### Distributed Consensus - Other protocols
+1. Raft: 
+   - Just like paxos but is easier to understand. 
+   - Paxos is tough and has a lot of failure scenarios
+2. Blockchain: 
+   - Just like Paxos but used when some nodes are lying 
+   - Requires everybody to be on the same page.
+
+### Paxos Uses
+1. Lightweight transactions in Cassandra. Not ACID transactions but this is within a partition (grouping of data guaranteed to be node-local). Within a partition multiple writes can be done transactionally. 
+   - Useful for creating user accounts to make sure two people don't take same username. INSERT IF NOT EXISTS
+2. Clustrix transactions
+3. Big Table's Chubby Lock manager
+4. Master election: Paxos API can be used for a master election. Everybody tries to write the name and if you read it and it returns your name then you are the leader, if it shows someone else's name, he is the leader.

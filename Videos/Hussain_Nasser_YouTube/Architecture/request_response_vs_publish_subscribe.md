@@ -27,3 +27,22 @@ Video: https://www.youtube.com/watch?v=O1PgqUqZKTA&list=PLQnljOFTspQXNP6mQchJVP3
     - Upload service handles the video uploading in the back-ground. Client is given an acknowledgement once it sends a video request to this service.
     - Uploader services copies the video to a distributed storage and adds a message to a compressor topic on the message broker
     - Compresser service listens to this topic. It downloads the video from storage, compresses and reuploads it back to storage. It adds a message to format topic.
+    - Format Service consumes from this topic and downloads the video from storage. It converts the video into different formats - 4K, 160 dpi, 480 dpi and pushes them to the storage. It adds a message to the notification topic once done
+    - Notification service notifies the client when the entire process is done.
+2. In this case, the entire process is decoupled and asynchronous
+
+
+### Pros
+1. Scales with multiple distinct receivers.
+2. Great for microservices. Can avoid spaghetti topology of everything connected to everything.
+3. Loose coupling. Things can be added and system can be modified easily.
+4. Works while clients is not running.
+
+### Cons
+1. Message Delivery issues (2-Generals Problems): Producer does'nt know whether the consumer has consumed the message successfully.
+2. Complex: 
+  - Back-pressure to restrict the producer to reduce it's flow so to allow the consumer to process. 
+  - Push model of pushing events to subscriber is complex and that too when the subscriber is down.
+  - Pull model of processing i.e periodically polling the broker to ask do you have a message? 
+  - Kafka uses long polling. 
+3. Network saturation: Shoving the network with a huge amount of content. Consumer may fail processing some of the content in which case you retry.
