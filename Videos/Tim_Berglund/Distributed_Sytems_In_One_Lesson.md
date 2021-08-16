@@ -1,7 +1,7 @@
 Video: 
 - https://www.youtube.com/watch?v=Y6Ev8GIlbxc
 - https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215265/
-- Currently watching Distributed Messaging https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215283/
+- Currently watching Kafka https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215284/(1:25)
 
 # Distributed Systems in One Lesson
 
@@ -424,3 +424,23 @@ One coordinator node and 3 nodes. Coordinator node handles the writes.
 2. Clustrix transactions
 3. Big Table's Chubby Lock manager
 4. Master election: Paxos API can be used for a master election. Everybody tries to write the name and if you read it and it returns your name then you are the leader, if it shows someone else's name, he is the leader.
+
+## Distributed Messaging
+1. Shows up as an enterprise integration pattern that are'nt primarily concerned with Distributed systems
+2. Means of loosely coupling sub-systems. One system generates events and placed them in a queue and consumer reads them to do work in an asynchrnous way that's not tied to the generator. 
+3. The two systems can be evolved independently, maintained by different teams, different technologies keeping the interface of the message contract intact
+4. Subscribers consume messages and created by producers.
+5. Organized into topics
+6. Processed by brokers. They store messages
+7. Messages are persisted over a short term thing. It's not the same as durability offered by a database.
+8. Problems at scale
+   - What if the topic gets big for a single computer? Topic is supposed to preserve ordering. If some of it goes on one machine and some on another, ordering is difficult. 
+   - What if one computer isn't reliable enough? Nodes fails and if it's short term persistence, there is data loss since we have a single copy of data.
+   - How strong are my delivery guarantees?
+
+### Messaging at scale with Kafka
+
+1. Kafka is a distributed message queue
+2. Horizontally scalable, fault tolerant
+3. Durable
+4. Fast: 100 MBs reads/writes per second. Thousands of clients per broker.
