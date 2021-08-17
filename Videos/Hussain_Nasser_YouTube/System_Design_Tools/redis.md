@@ -1,4 +1,4 @@
-Video: https://www.youtube.com/watch?v=sVCZo5B8ghE&list=PLQnljOFTspQXNP6mQchJVP3S-3oKGEuw9&index=3(15:00)
+Video: https://www.youtube.com/watch?v=sVCZo5B8ghE&list=PLQnljOFTspQXNP6mQchJVP3S-3oKGEuw9&index=3(30:00)
 
 # Redis
 Redis is an in-memory key-value NoSQL database
@@ -15,9 +15,18 @@ Redis is an in-memory key-value NoSQL database
 2. Journalling - append only log: Append the value of a key to a commit log. All inserts, updates, deletes are appended to this log.
 3. Acknowledge - when? Is it when it appended in-memory or appended to log? Ack is given when it's updated in memory
 4. Snapshotting: Periodically take a snapshot of in-memory structures and flush it to disk. Might loose some data
+4. Both happen asynchronously in the background
 
 ## Transport Protocol
+1. Uses TCP. All databases uses TCP.
+2. Request/Response. Get that key. Update that key. 
+3. Message format - Redis Serialization Protocol (RESP)
 
 ## PUB/SUB
+1. Producers can subscribe to a channel and consumers can consume from it.
+2. They use a Push model and not a long polling model. The number of clients using Redis will be limit.
 
 ## Replication/Clustering
+1. Replication: One leader many followers model.
+2. Clustering: Can shard data across multiple nodes on the basis of a shard key.
+3. Combine clustering with replication. Each leader partition will have part of the data and each will replicate it's part to its followers.

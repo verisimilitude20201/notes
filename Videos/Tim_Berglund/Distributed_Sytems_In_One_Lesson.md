@@ -1,7 +1,7 @@
 Video: 
 - https://www.youtube.com/watch?v=Y6Ev8GIlbxc
 - https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215265/
-- Currently watching Kafka https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215284/(1:25)
+- Currently watching Kafka https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215284/(8:00)
 
 # Distributed Systems in One Lesson
 
@@ -434,7 +434,7 @@ One coordinator node and 3 nodes. Coordinator node handles the writes.
 6. Processed by brokers. They store messages
 7. Messages are persisted over a short term thing. It's not the same as durability offered by a database.
 8. Problems at scale
-   - What if the topic gets big for a single computer? Topic is supposed to preserve ordering. If some of it goes on one machine and some on another, ordering is difficult. 
+   - What if the topic gets big for a single computer because of storage or velocity of a data? Topic is supposed to preserve ordering. If some of it goes on one machine and some on another, ordering is difficult. 
    - What if one computer isn't reliable enough? Nodes fails and if it's short term persistence, there is data loss since we have a single copy of data.
    - How strong are my delivery guarantees?
 
@@ -444,3 +444,17 @@ One coordinator node and 3 nodes. Coordinator node handles the writes.
 2. Horizontally scalable, fault tolerant
 3. Durable
 4. Fast: 100 MBs reads/writes per second. Thousands of clients per broker.
+5. Some definitions
+  - Message: An immutable array of bytes. Messages generally correspond to concept of events in Spark/Storm
+  - Topic: Feed of messages. Ordering is subtle in a topic
+  - Producer: a Process that publishes messages to a topic
+  - Consumer: Single threaded process that subscribes to a topic
+  - Broker: One of the servers that comprises of the cluster.
+6. When data becomes too much for one server to handle, we split it up (Sharding, consistent hashing). Kafka splits a topic into different partitions each gets allocated on a different broker.
+
+                           Partitions             Indexes                     Producer 
+      Consumers            0                      0|1|2                       Producer A
+      Consumers            1                      0|1|2|3|4|5                 Producer C
+      Consumers            2                      0|1|2|3|4                   Producer B             
+
+   The partition is decided by the key of message that's produced by a producer along with a partitioner strategy. Consumers will open a socket with the machine that has partition 1.

@@ -1,4 +1,4 @@
-Video: https://www.youtube.com/watch?v=ntCGbPMeqgg&list=PL_z_8CaSLPWekqhdCPmFohncHwz8TY2Go&index=5(18:00)
+Video: https://www.youtube.com/watch?v=ntCGbPMeqgg&list=PL_z_8CaSLPWekqhdCPmFohncHwz8TY2Go&index=5(33:00)
 
 # Bottom Up Knapsack - Max Profit
 
@@ -37,5 +37,32 @@ Capacity = 7
        
 
 
-2. We need to initialize the matrix because we're replacing iteration with recursion. So we need to initialize to handle the base condition.
-3. We replace the recursive calls with iterative versions.
+2. We need to initialize the matrix because we're replacing iteration with recursion. So we need to initialize to handle the base condition. Add the 0s for base condition
+
+        
+
+               0   1   2   3   4   5   6   7
+        
+        V W 0  0   0   0   0   0   0   0   0
+
+        1 1 1  0
+
+        4 3 2  0
+
+        5 4 3  0
+
+        7 5 4  0
+
+- Recursive base condition
+    
+        if n == 0 or W == 0:
+            return 0
+
+- Iterative Base condition
+        
+        for i in range(0, n + 1):
+            for j in range(0, W + 1):
+                if i == 0 or j == 0:
+                    a[i][j] = 0
+
+3. Now we need to write the iterative equivalent of the recursive code written for choice diagram. The code will be similar. Only we will replace n and W with i and j and do it in an iterative fashion.
