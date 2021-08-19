@@ -1,7 +1,7 @@
 Video: 
 - https://www.youtube.com/watch?v=Y6Ev8GIlbxc
 - https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215265/
-- Currently watching Kafka https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215284/(8:00)
+- Currently watching Zookeeper https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215282/(8:00)
 
 # Distributed Systems in One Lesson
 
@@ -458,3 +458,33 @@ One coordinator node and 3 nodes. Coordinator node handles the writes.
       Consumers            2                      0|1|2|3|4                   Producer B             
 
    The partition is decided by the key of message that's produced by a producer along with a partitioner strategy. Consumers will open a socket with the machine that has partition 1.
+
+7. A consumer is dedicated to a partition and he gets messages in order. 
+8. There is'nt a global partition way to determine the ordering of messages
+9. Partitioning
+   - Scaling Strategy
+   - Done in the producer by the pluggable class and a message key. We do have a say in how it works. We can partition say by example by user_id, IP address.
+   - At times, we need random partitioning. We just need to get the work done.
+   - Ordering is maintained per partitions only.
+10. Zookeeper
+  - Zookeeper is a required part of Kafka architecture
+  - Producers user is to find partitions and replication information
+  - Consumers use it to track the current per partion index. Since they request messages by index.
+
+11. Replication:
+    - Brokers can fail. To maintain durability we can replicate.
+    - Configurable in-sync replicas sets
+    - One leader and (n-1) followers
+    - Only the leader communicates with clients for reading or writing
+    - On failure, a new leader is elected.
+    - Pretty good guarantee of consistency there since we are always reading/writing from one leader
+    - A little window is there when a client delivers a write to the leader, leader fails without delivering the write to the replica set. The write may be lost. While writing we can decide the consistency semantics to set the level. The question is is it okay for leader to take the write and return success or should it wait till the write is replicated to all nodes? It's for the producer i.e the application to take the trade-off here.
+12. Widely deployed. Twitter / Netflix / Pinterest / Netflix use huge Kafka clusters.
+13. JVM based: Written in Scala.
+14. Native Scala and Java APIs (Akka option).
+15. Binary Wire protocol
+16. Start at three nodes ad grow.
+
+
+## Zookeeper
+1. Zookeeper is a work-horse for lots and lots of distributed systems. Crops up most of the times in a distributed system use-case.
