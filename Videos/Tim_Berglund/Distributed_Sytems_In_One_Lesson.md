@@ -1,7 +1,7 @@
 Video: 
 - https://www.youtube.com/watch?v=Y6Ev8GIlbxc
 - https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215265/
-- Currently watching Zookeeper https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215282/(8:00)
+- Currently watching Zookeeper https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215282/(9:45)
 
 # Distributed Systems in One Lesson
 
@@ -488,3 +488,53 @@ One coordinator node and 3 nodes. Coordinator node handles the writes.
 
 ## Zookeeper
 1. Zookeeper is a work-horse for lots and lots of distributed systems. Crops up most of the times in a distributed system use-case.
+2. Zookeeper is a centralized service for maintaining configuration information, naming, providing distributed synchronization and providing group services. Showed up in Hadoop but many systems use it.
+3. Highly available. 
+4. Manages shared state of any kind
+5. Transaction control and lock management problem.
+6. It's a distributed hierarchical key value store.
+
+### Architecture
+1. Written in Java
+2. Official APIs in C and Java. Bindings exists in all languages. Defines a customer-wire protocol in case you need to define your own binding.
+3. In-memory (on-heap). It's not a database, it's a meta-data server, keeps track of house-keeping.
+4. Minimum of 3 nodes for Production for maintaining Quorum
+5. All nodes participate in reading/writing. Single master database though.
+6. Zookeeper refers to a cluster by the word ensemble
+7. Consider the below set-up
+
+   L - Leader
+   F1 - Follower 1
+   F2 - Follower 2
+   F3 - Follower 3
+
+   - All writes are propagated first to the master by the follower to be successfull. Master looks for a quorum of writes. In this case we could loose one nodes and still have Quorum. If a write is currently sent to F1, it sends it to the leader and leader sends it to other follower and waits for a quorum to apply the write. There's eventual consistency here - there may be a chance of a stale read.
+   - All reads can be taken up by any node
+
+### Data Mode
+1. Hierarchical striucture just like a file system
+2.  
+         / (Root Node)
+         -- Denver (Z-Node)
+         |       |
+         |       |
+         |       ---- Lock_15
+         -- Colorado
+                  |
+                  |
+                  |
+                  ---- Lock_21
+                  |
+                  |
+                  ---- Statuses
+
+3. Z-node
+   - Every Z-node has a value (simply a byte array about at max 10 KB in size) and children 
+   - Have per Z-node ACLs. 
+   - Independent, non-inherited ACLs
+   - Versioned
+   - Zero or more children
+   - Session/Ephemeral nodes (only as long as a session exists. Don't have children) and Persistent nodes (Persistent)
+   - Counting ZNodes: We can have Zookeeper insert a monotonically increasing counter. Can be used for lock management and leader elections
+
+4. 
