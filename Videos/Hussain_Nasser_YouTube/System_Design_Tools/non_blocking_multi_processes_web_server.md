@@ -8,7 +8,12 @@ Video: https://www.youtube.com/watch?v=hmTl5Y4ee_Y&list=PLQnljOFTspQXNP6mQchJVP3
 ## Blocking single-process
 
 ## Non-blocking multi-process back-end
+1. Child process can send information to the parent. But parent cannot send anything to the child.
+2. Parent process object is accessible as a global variable.
 
 ## Pros 
-
+1. Efficient than single process. User does'nt stay blocked.
+2. Can create a pool of available processes and limit the application to these processes.
+3. Multiple instances of containers can be more efficient, maintenable than multi-processing or multi-threading.
 ## Cons
+1. Avoid multi-processing application as much as possible. It's complex to maintain, debug, we can get orphan processes.

@@ -1,7 +1,7 @@
 Video: 
 - https://www.youtube.com/watch?v=Y6Ev8GIlbxc
 - https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215265/
-- Currently watching Zookeeper https://learning.oreilly.com/videos/distributed-systems-in/9781491924914/9781491924914-video215282/(9:45)
+
 
 # Distributed Systems in One Lesson
 
@@ -537,4 +537,27 @@ One coordinator node and 3 nodes. Coordinator node handles the writes.
    - Session/Ephemeral nodes (only as long as a session exists. Don't have children) and Persistent nodes (Persistent)
    - Counting ZNodes: We can have Zookeeper insert a monotonically increasing counter. Can be used for lock management and leader elections
 
-4. 
+4. Watches
+   - One time trigger on a ZNode value or status of it's children that watches a ZNode's status or balue for changes
+   - Guaranteed to be seen by the client before the data changes
+
+5. ACLs
+   - Apply to individual nodes(not children)
+   - ZNode contains a list of IDs which have various access semantics
+   - World(everybody), auth(everybody who signed in), digest(hash of the username and password of the person who joined in), ip(any client who has signed in from this IP)
+   - IDs have permissions - CREATE, READ, WRITE, DELETE, ADMIN
+
+6. Use Case - Leader Election
+   - Create a ZNode called leader-election. 
+   - All candidates create ephemeral sequential and session children under the leader-election ZNpde
+   - The child of leader-election with the smallest sequence number is the leader.
+   - To know if a node can get elected as the next leader, keep a watch on the session of the ZNode with the smallest sequence number. If that session dies and that ZNode goes away, this node can become the masters. 
+   - If the current leader goes down, then after it comes back up there's another leader. So it can simply generate a new session ephemeral sequential session and go at the back of the queue. 
+   - Reliance of single master setups usually have relatively lengthy downtimes for leader failover
+
+7. Use Case - Distributed Locks
+   - Create a Znode called "resource"
+   - Create ephemeral node called resource/hostname -i
+   - Examine children of resource. If I hold the lowest ID, I hold the lock
+   - Otherwise watch the ID preceding mine. Upon update event, I hold the lock. 
+   - To release the lock, delete the ephemeral node. 
