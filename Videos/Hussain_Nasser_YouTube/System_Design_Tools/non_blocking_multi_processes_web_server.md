@@ -15,5 +15,10 @@ Video: https://www.youtube.com/watch?v=hmTl5Y4ee_Y&list=PLQnljOFTspQXNP6mQchJVP3
 1. Efficient than single process. User does'nt stay blocked.
 2. Can create a pool of available processes and limit the application to these processes.
 3. Multiple instances of containers can be more efficient, maintenable than multi-processing or multi-threading.
+
 ## Cons
 1. Avoid multi-processing application as much as possible. It's complex to maintain, debug, we can get orphan processes.
+2. Need to add checks on the parent to check the list of processes if they are alive.
+
+
+Instead of this, we can create multiple instances of single-process micro-services.Containers are isolated and they can be kept behind a load-balancer which keeps track of the load on each instance and redirect the requests accordingly. An alternative to multi-processing is creating a pool of processes that are pre-baked that can be used to do this.
