@@ -9,10 +9,10 @@
 
 3. Initialization: Construct a similar matrix of size n + 1 and W + 1 where n is 6 and W = 11
 
-               0   1   2   3   4   5   6   7   8   9   10   11
+        S ->   0   1   2   3   4   5   6   7   8   9   10   11
         
-            0  T   F   F   F   F   F  F    F   F   F   F    F 
-
+        N   0  T   F   F   F   F   F  F    F   F   F   F    F 
+        |
             1  T
 
             2  T
@@ -27,3 +27,11 @@
 
     - 0th Column: We can have a empty subset of sum to be 0 and array including 0 to 5 elements. So 0th column we put True.
     - 0th Row: We cannot have a sum to be greater than 0 when we are not given any element in array. So 0th row will all have F - False 
+
+4. Mapping with Knapsack problem: 
+   - Map this array to the Knapsack's problem's weight array and sum to be the Knapsack's total weight.
+   - Value array will be absent
+   - Intialization will proceed as above
+   - dp[i][j] = arr[i - 1][j - arr[i]] || arr[i - 1][j]
+
+
