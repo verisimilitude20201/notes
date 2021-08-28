@@ -1,4 +1,4 @@
-Video:  https://www.youtube.com/watch?v=fVmQCnQ_EPs&list=PLQnljOFTspQXNP6mQchJVP3S-3oKGEuw9&index=5(20:35)
+Video:  https://www.youtube.com/watch?v=fVmQCnQ_EPs&list=PLQnljOFTspQXNP6mQchJVP3S-3oKGEuw9&index=5(41:09)
 
 # GraphQL
 1. Open-source query language developed by Facebook to fetch different query results from APIs
@@ -24,7 +24,13 @@ Video:  https://www.youtube.com/watch?v=fVmQCnQ_EPs&list=PLQnljOFTspQXNP6mQchJVP
 ## Examples (github API)
 
 ## Pros
+1. Extremely flexible. If you don't know how your front-end looks like, it's best one for you. Similar to SQL. Specify only what you want.
+2. Efficient response: Get what you need.
+3. No round-trips, single network call mentioning only what you need. Can create adhoc queries.
+4. Single endpoint
+5. Self-documenting. One query can describe the entire system
 
 ## Cons
+1. Complex: Cannot just download and set up like PostgreSQL. Gotta understand a lot of things - the resources, the constituents of resources, defining a GraphQL schema. Can have a schema-less alternative to simplify things. For example: SOAP had an XML schema which gave way for REST. REST was adopted in a manner not recommended by Roy Fielding.
 
 ## When to use GraphQL over REST
