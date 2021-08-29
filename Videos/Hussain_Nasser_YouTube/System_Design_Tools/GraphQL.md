@@ -32,5 +32,14 @@ Video:  https://www.youtube.com/watch?v=fVmQCnQ_EPs&list=PLQnljOFTspQXNP6mQchJVP
 
 ## Cons
 1. Complex: Cannot just download and set up like PostgreSQL. Gotta understand a lot of things - the resources, the constituents of resources, defining a GraphQL schema. Can have a schema-less alternative to simplify things. For example: SOAP had an XML schema which gave way for REST. REST was adopted in a manner not recommended by Roy Fielding.
+2. Typed system: Can slow adoption because of having a schema.
+3. No Caching (Post only)
+4. No standard HTTP errors.
+5. Expensive queries on the back-end. For example: every 3 recent comments on the last 10 posts along with their author id and the author email. Someone can do a DoS attack on the server by repeatedly executing expensive queries. REST is a cacheable system.
 
 ## When to use GraphQL over REST
+1. Public adhoc API you can't predict how it will be used: GraphQL
+2. Specific and well designed use-cases for APIs: REST
+3. Simple APIs that serves one client: REST
+4. Enterprise APIs (NY times: GraphQL APIs on top of Kafka): GraphQL
+5. Well defined schema: GraphQL
