@@ -4,6 +4,7 @@
           arr = [2, 3, 5, 6, 8, 10], Sum = 10
 For example: this will return 3 - [10], [2, 3, 5], [2, 8]
 
-2. Initialization: Initialize the same matrix of size [n+1][Sum+1] i.e. 7 * 11
+2. Initialization: Initialize the same matrix of size [n+1][Sum+1] i.e. 7 * 11. Initialization is same as subset sum, only difference is 0th column will be 1 and 0th row of the matrix from 1 onwards. 
+
 
 3. Code is similar to subset sum problem, instead of OR, please plus them.
