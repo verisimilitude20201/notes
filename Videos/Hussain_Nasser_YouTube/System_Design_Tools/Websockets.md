@@ -1,4 +1,4 @@
-Video: https://www.youtube.com/watch?v=2Nt-ZrNP22A&list=PLQnljOFTspQXNP6mQchJVP3S-3oKGEuw9&index=6(25:00)
+Video: https://www.youtube.com/watch?v=2Nt-ZrNP22A&list=PLQnljOFTspQXNP6mQchJVP3S-3oKGEuw9&index=6(41:00)
 
 # Websockets
 
@@ -26,3 +26,13 @@ Video: https://www.youtube.com/watch?v=2Nt-ZrNP22A&list=PLQnljOFTspQXNP6mQchJVP3
   - First request is a normal HTTP GET request with an Upgrade Header set to Websockets
   - Server responds with 101 (Switching protocols) if it supports Websockets.
   - Few random strings are exchanged between the client and server just to verify that server is the same that the client first send the request to.
+
+
+## Pros
+1. Full duplex. Polling not required if the client needs a server to send updates whenever they are available.
+2. HTTP Compatible because of the presence of the Upgrade header.
+3. Firewall friendly. Because it's HTTP either 80 or 443.
+
+## Cons
+1. Proxying is tricky. Nginx just started supporting Web socket traffic. Layer 7 proxy terminates the TLS connection and so there will be two connections between client and proxy and proxy and server
+2. L7 load balancing timeouts challenging. The connection should stay open for longer periods of time.
