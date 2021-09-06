@@ -36,3 +36,9 @@ Video: https://www.youtube.com/watch?v=2Nt-ZrNP22A&list=PLQnljOFTspQXNP6mQchJVP3
 ## Cons
 1. Proxying is tricky. Nginx just started supporting Web socket traffic. Layer 7 proxy terminates the TLS connection and so there will be two connections between client and proxy and proxy and server
 2. L7 load balancing timeouts challenging. The connection should stay open for longer periods of time.
+3. Stateful, difficult to horizontally. Can persist the connection IDs to a database
+
+## Do you have to use Websockets ? 
+1. If bi-directional communication is needed?
+2. Long polling: Client makes a request and can wait until a server has the information. Kafka uses long-polling. Problem with Web sockets is server does'nt know that the client has disconnected.
+3. EventSource: Server pushes information all the time like notifications. Most Websockets use-cases we can solve with Event Source
