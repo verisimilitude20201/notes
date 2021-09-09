@@ -1,4 +1,4 @@
-Video: https://www.youtube.com/watch?v=Cie5v59mrTg&list=PLQnljOFTspQXNP6mQchJVP3S-3oKGEuw9&index=8(08:25)
+Video: https://www.youtube.com/watch?v=Cie5v59mrTg&list=PLQnljOFTspQXNP6mQchJVP3S-3oKGEuw9&index=8(33:39)
 
 # RabbitMQ
 
@@ -15,6 +15,8 @@ Video: https://www.youtube.com/watch?v=Cie5v59mrTg&list=PLQnljOFTspQXNP6mQchJVP3
 7. Channel is a logical connection in the system. They wanted to separate the consumer connection from multiple consumers. A consumer can have 3 channels inside the same TCP connection. This is called multiplexing. You bring a lot of stuff in one pipe.
 8. Queues are another abstraction. Publisher and consumer are not aware of the queues. They are aware of an exchanges.
 9. Exchanges rout messages to queues to fan-out, round-robin messages to different queues.
+10. Consumer keeps on receiving the message till we acknowledge it.
+11. RabbitMQ can guarantee at-least once or atmost once delivery. Not Exactly Once.
 
 ## Spin RabbitMQ server with Docker
 
