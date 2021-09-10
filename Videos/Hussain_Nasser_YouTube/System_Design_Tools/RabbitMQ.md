@@ -17,8 +17,9 @@ Video: https://www.youtube.com/watch?v=Cie5v59mrTg&list=PLQnljOFTspQXNP6mQchJVP3
 9. Exchanges rout messages to queues to fan-out, round-robin messages to different queues.
 10. Consumer keeps on receiving the message till we acknowledge it.
 11. RabbitMQ can guarantee at-least once or atmost once delivery. Not Exactly Once.
+12. Too many abstractions: If you build a system with so many abstractions, if you want to add a new abstraction, you have to remove one. RabbitMQ has exchanges, queues, publishers, consumers, 3 protocols - AMQP, HTTP and lots of stuff to learn. Too complex lots of stuff to learn.
+13. It's a Push model. When a consumer consumes from a queue, RabbitMQ pushes a message to the consumer. If we have a 1000 messages in queue, it involves more work on the server to push messages to the consumer to process them. Kafka does a long polling model - pushes the complexity to the consumer it does long polling - whenever the consumer is ready, consume. 
 
-## Spin RabbitMQ server with Docker
 
 
 
