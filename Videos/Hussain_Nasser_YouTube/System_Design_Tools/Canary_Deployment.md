@@ -1,4 +1,4 @@
-# Video: https://www.youtube.com/watch?v=3IJ5ko8jSIA&list=PLQnljOFTspQXNP6mQchJVP3S-3oKGEuw9&index=17
+Video: https://www.youtube.com/watch?v=3IJ5ko8jSIA&list=PLQnljOFTspQXNP6mQchJVP3S-3oKGEuw9&index=17
 
 # Canary Deployment
 
