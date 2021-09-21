@@ -1,4 +1,4 @@
-Video: https://www.youtube.com/watch?v=8qU3hZOXlBE&list=PLQnljOFTspQXNP6mQchJVP3S-3oKGEuw9&index=17&t=1s(10:00)
+Video: https://www.youtube.com/watch?v=8qU3hZOXlBE&list=PLQnljOFTspQXNP6mQchJVP3S-3oKGEuw9&index=17&t=1s
 
 # Evolution of Virtual machines
 
