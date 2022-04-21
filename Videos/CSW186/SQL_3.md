@@ -8,12 +8,12 @@ Video: https://www.youtube.com/watch?v=8Uxt9scWJBY&list=PLYp4IGUhNFmw8USiYMJvCUj
 2. System R and Ingress were two primary research projects having two languages SQL and QUEL language
 3. Oracle beat IBM in bringing out a commercial SQL-based database before IBM brought DB2
 4. Questioned repeated
-a. OQL was developed for OO databases
-b. XML was proposed in the 2000s and brought with it XPath, XQuery and XSLT
-c. NoSQL movement rejected SQL in favor of more programmetic languages like just get and set key and workflows like MapReduce
+    a. 90s: OQL was developed for OO databases
+    b. 2000s: XML was proposed in the 2000s and brought with it XPath, XQuery and XSLT
+    c. 2010s: NoSQL movement rejected SQL in favor of more programmetic languages like just get and set key and workflows like MapReduce
 
 ## Features
-1. Declarative language: You just say what you want through queries and not how to get it. The database strategy to compute the data may change and may not be same for the same query
-2. Implemented widely.
-3. SQL is a domain specific language for querying data. You cannot write algorithms in SQL, it's not for Turing-complete tasks
-4. General Purpose, feature rich, can mix your imperative code and SQL code.
+1. Declarative language: You just say what you want through queries and not how to get it. The database strategy to compute the data may change and may not be same for the same query depending on data, the changes to data & hardware
+2. Implemented widely with varying levels of efficiency and completeness
+3. SQL is a domain specific language for querying & manipulating data. You cannot write algorithms in SQL, it's not for Turing-complete tasks
+4. General Purpose, feature rich, can mix your imperative code and SQL code.~
