@@ -109,3 +109,159 @@
    - Too many different objects and you can't have that many tables
    - the data structure is determined by external systems over which you have no control.
 8. In case where all records have same structure, schemas are a useful mechanism for documenting and enforcing schema.
+
+### Data locality for queries
+1. A document is stored as a single continuous string encoded as JSON, XML or a binary variant such as MongoDB's BSON.
+2. If the application needs to access the entire document, there is performance advantage to this data locality. Instead of that, if we store in relational DB, multiple index lookups and disk seeks are required to access different parts of the document.
+3. Locality advantage applies only if you access large parts of the document at the same time.
+4. On updates, the entire document usually needs to be rewritten. Only modifications that don't change the encoded size of the document can be performed in-place.
+5. For document databases, it's recommended to keep the size fairly small and avoid writes that incease the size of a document.
+6. Google's spanner db offers the same data locality in a relational model by allowing the schema to declare that the table's rows should be interleaved within the parent table. Oracle allows the same using a feature called multi-table index cluster. Column family concept within BigTable model has a similar way of managing locality.
+
+### Convergence of document and relational databases
+1. XML has been supported in relational systems since 2000s. This includes the ability to do local modifications and to index and query inside XML documents.
+2. PostgrSQL and MySQL offer similar capabilities for JSON. It's likely that other relational databases will follow suit.
+3. On the document DB side, Rethink DB supports joins in it's query language, MongoDB drivers automatically resolve document references (client side join, although this is much slower than join performed in the database.
+4. Relational and Document DBs are becoming more-or-less similar over time. If a database is able to handle documents and perform relational queries on it, applications can use combination of feature that best fit their needs.
+
+## Query languages for Data
+1. Relational model introduced a new way of querying data. SQL is declarative whereas IMS and CODASYL were imperative. When SQL was defined, it followed the structure of relational algebra fairly closely.
+2. An imperative language tells the computer to perform certain operations in a certain order. Like doing looping, evaluating conditionals, modifying state.
+3. In a declarative query language, you define pattern of data you want, what conditions should the data meet, how you want the results to be transformed. It's upto the query optimizer to decide which join algorithm to use, which indexes, and in which order to execute the various parts of the query.
+4. Declarative language hides the implementation details of the database system to introduce additional performance improvements without making any changes to the queries.
+5. For example: if we have a function that loops through a list of animals and selects only "Sharks". This list of animals comes in a particular order. If the database wants to reclaim/coalesce unused disk space, it might need to move records around, changing the order in which the list is returned. Can this be done by the DB without breaking queries? SQL does'nt guarantee any ordering so it does'nt mind if the order changes.
+6. The fact that SQL is more limited in functionality gives the database more room for optimizations.
+7. Declarative languages lend themselves well to parallel execution. Today's CPUs are made faster by adding more cores and not through higher clock speeds. Imperative codes is hard to parallelize since it expects the execution to proceed in a certain order. Declarative languages just specify the pattern of results and the DB is more free to use a parallel implementation of the query language
+
+## Declarative queries on the Web
+1. On the Web, both XSL and CSS are declarative languages for specifying the styling of a document. 
+2. Instead of that, if you had to use the imperative way using the JavaScript DOM model, you would've had to write awful amount of code to achieve the same thing. Plus you won't be able to take any performance advantage without rewriting the code. 
+3. In a web browser, using declarative CSS styling is much better than manipulating styles imperatively in JavaScript. Similarly in databases, declarative query languages like SQL turn out to be better than imperative APIs.
+
+## Map Reduce Querying
+1. MapReduce is a programming model for processing large amounts of data in bulk across many machines. A form of MapReduce is supported by some NoSQL datastores like MongoDB and CouchchDB for performing read-only queries across many documents.
+2. The logic of the query is expressed with snippets of code which are called repeatedly by the processing framework. It's based on map(collect) and reduce(fold or inject) functions existing in many programming languages.
+3. Take an example. A marine biologist wants to add an observation record every time he sights animals in the ocean. Now, he wants to create a report of how many sharks are sighted per month. 
+   - A simple PostgreSQL query
+      ```
+      SELECT MONTH(observation_timestamp), SUM(num_animals)
+      FROM observations 
+      WHERE family="Sharks"
+      GROUP BY MONTH(observation_timestamp);
+      ```
+   - Same can be expressed in MongoDB's MapReduce feature
+4. The map and reduce functions are restricted in what they are allowed to do. 5. They are pure functions in that they can use only the data passed to them as input and cannot do any additional DB queries. This restriction allows them to be run anywhere in any order and rerun on failure.
+6. MapReduce is a fairly low-level model for distributed execution on a cluster of machines. Higher level SQL can be implemented as a pipeline of operations but there are also many distributed implementations of SQL that don't use MapReduce.
+7. MapReduce has a slight disadvantage. You need to write two carefully coordinated functions which is harder than writing a single query. Declarative query language offers more opportunities for a query optimizer to improve the performance of a query. For these reasons, MongoDB added the support for a declarative aggregation pipeline.
+
+## Graph-like models
+1. If your applications has no relationships or one-to-many relationships, the document model is appropriate. 
+2. As many-to-many relationships become more common, relational databases which can handle simpler many-to-one and many-to-many relationships become too unweildy. It's then that you shift to a Graph model / Graph database
+3. Graph consists of two kinds of objects: vertices (nodes or entities) and edges(relationships or arcs)
+4. Typical examples of Graphs
+   - Social Graphs: Vertices are people, edges are which people know each other
+   - Web graph
+   - Rail-road network.
+5. We can have various Graph algorithms applied to these graphs
+   - PageRank determines the popularity of a web page and it's ranking
+   - Navigational systems search for the shortest path.
+6. A graph may not contain all homogenous data. We can have a graph storing different types of objects in a single datastore. For eg Facebook's social media graph.
+7. Several different ways of structuring and querying graphs. Property Graph model is one way implemented by Titan and Triple Store model used by Datomic, AllegroGraph are two ways. 
+8. There are 3 declarative query languages for Graphs: Cypher, SPARQL and Datalog. Gremlin is conceptually similar.
+
+### Property Graph model
+1. Each vertex consists of
+   - Unique identifier
+   - Set of outgoing edges
+   - Set of incoming edges
+   - Collection of key-value properties
+2. Each edge consists of 
+   - Unique identifier
+   - Tail vertex: Edge starts at this vertex. 
+   - Head vertex: Edge ends at this vertex.
+   - Label describing the kind of relationship between the two vertices
+   - Collection of key-value properties
+
+3. Can be moddelled by this relational schema
+```
+CREATE TABLE vertices (
+   vertex_id integer PK,
+   properties json
+)
+
+CREATE TABLE edges (
+   edge_id integer PK,
+   tail_vertex integer references vertices(vertex_id),
+   head_vertex integer references vertices(vertex_id),
+   label text,
+   properties json
+)
+```
+4. Few imp properties
+   - Any vertex can have an edge connecting with any other vertex.
+   - Given a vertex, you can efficiently find both it's incoming and outgoing edges and thus traverse the graph.
+   - We can use different kinds of labels for different relationships to store several different kinds of information. Thus we could use this to express different kinds of information that's difficult in a relational schema 
+5. Graphs are good for evolvability. As you add features, a graph can be easily extended to accomodate changes to your schema.
+
+### The Cypher query language
+1. Declarative query language created for property graphs used in Neo4j database.
+2. The query can select a node/vertex and follow all edges/vertices from that vertex that satisfy a certain query. For eg: Find all people born in any city of India and who have emigrated to UAE.
+3. You just need to specify the query, the query optimizer automatically chooses the strategy that is predicated to be most efficient.
+
+### Graph queries in SQL
+1. In a relational database, you normally know how many joins are needed in your query. 
+2. In a graph query, you may need to traverse a variable number of edges before you find the vertex that you're looking for. 
+3. In a Cypher query language, the :WITHIN*0.. means follow a WITHIN edge zero or more times 
+4. Since SQL:99, this idea of traversal of variable-length traversal paths is very common  and can be expressed using something called recursive common table expressions. 
+
+### Triple Stores and SPARQL 
+1. Triple Stores are similar to the Property-Graph model
+2. A Triple Store model stores all informations in three part statements of (subject, object, predicate). For example: (Jim=subject, likes=predicate, bananas=object)
+3. Subject is equivalent to a vertex
+4. Object can be
+   - Primitive data-type. In this case predicate and object of the triple are equivalent to the key-value pair for the subject. eg (Lucy, age, 33)
+   - Another vertex in the graph. In this case, the subject is the tail vertex, the object is the head vertex and predicate is an edge (Abhijit, marriedTo, Deepali)
+5. For example: TripleStore data in Turtle format
+```
+_:lucy a :Person
+_:lucy :name "Lucy"
+```
+6. Semantic Web: 
+   -  Websites publish informations for humans to consume so they should also publish data for machines to consume. 
+   -  This is the idea behind Semantic Web. Resource description framework was intended as a mechanism for different websites to publish data to be automatically combined into a web of data
+   - Semantic web did'nt really take off as intended due to overly complex proposals and standards. 
+   - Triples can be a good internal model for applications even if we don't publish RDF data. Turtle language based on triple store can be a good format for RDF data.
+
+### SPARQL query language
+1. Is a query language used for triple data stores using RDF model. It predates Cypher. 
+2. We can write a concise query  in SPARQL than it is in Cypher.
+3. RDF does'nt distinguish between properties and edges and uses predicates for both, same syntax can be used for matching properties.
+
+### Are Graph model the second coming of CODASYL Network data model? 
+1. CODASYL had a schema that specified which record type could be nested in which other record.
+   Graph does'nt have such restriction. Any vertex can connect with any other vertex via an edge.
+2. In CODASYL, the only way to access a record was to traverse one of the access paths
+   In Graph, you can access any vertex by it's unique ID or via an index on one of it's properties.
+
+3. Codacyl records were ordered sets. Applications had to worry about that order while inserting the record.
+   In Graph, vertices and edges are not ordered. You can apply sort on them. 
+
+4. CODACYL had all queries imperative, difficult to write and broken easily by the schema. 
+   Graph provides the flexibility of both imperative queries and high-level, declarative queries as well.
+
+### Datalog - The Foundation
+1. Datalog is an older query language than SPARQL or Cypher and provides the foundations on which most query languages are built on.
+2. It's the query language of Datomic and Cascalog which is a datalog implementation for querying large datasets in Hadoop.
+3. Datalog's query model is similar to triple-store. Instead of writing it as (subject, predicate, object), we write it as predicate(subject, object). For example:
+    ```
+    name(namerica, "North America")
+    type(namerica, continent)
+    name(usa, "United States")
+    ```
+4. When it comes to query, Cypher and SPARQL jump in right away with SELECT. For Datalog
+   - we define rules that tell the database about the new predicate
+   - Predicates are not stored in DB, but instead they are derived from other rules or data
+   - Rules can refer to other rules.
+   - In rules, words in upper case are variable names and rules are matched similar to SPARQL. 
+   - A rule matches if the system can find a match for all predicates on the right hand side of the :- operator
+   - 
