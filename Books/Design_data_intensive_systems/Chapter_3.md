@@ -40,4 +40,32 @@
 11. Details that go in the implementation 
     - File format: Faster and simpler to use a binary format that encodes the length of string in bytes followed by raw string in bytes without any escaping.
     - Deletion: Deletion is handled by a appending a special deletion record called tombstone to the data file. During merging, tombstone tells the merging process to discard any previous values for the deleted key.
-    - Crash recovery
+    - Crash recovery: If database restarts, the in-memory hashmaps are lost. Bitcask speeds up recovery by storing a snapshot of each segment's in-memory hashmap on disk which can be loaded into memory more quickly than regenerating the hashmap by scanning through all segment files
+    - Partially written records: The database may crash at any time including half-way through appending a record to the log. Checksums allow such corrupted parts to be detected and ignored.
+    - Concurrency: A common implementation choice is a single writer. File segments are append-only and immutable. Therefore, they can be read by read by several concurrent threads. 
+    - Why append-only log is good
+        - Appending and segment merging are sequential write operations much faster than random writes on magnetic spinnning disks and SSDs.
+        - Concurrency and crash recovery becomes simple. 
+        - Merging old data segments avoids fragmentation.
+    -  Hash-table index disadvantages
+        - The Hash-table must fit in memory. It's possible to maintain the hashmap on disk but it's inefficient to make it perform well, needs a lot of random I/O and handle hash collisions. 
+        - Range queries are inefficient
+
+### SSTables and LSM-trees
+1. We can make a simple change to the format of our sequence files. We require that sequence of key-value pairs is sorted by key. 
+2. Now, to this we cannot append key-value pairs to the segment immediately since writes can occur in any order. 
+3. SSTables have advantages over hash indexes
+    - Merging segments is simple and efficient even if the files are bigger than the availaible memory.
+    - Uses the merge sort algorithm.
+    - Look at the input files side-by-side, copy the lowest key according to sort order and repeat to an output file. This produces a new merged segment file sorted by key.
+    - When multiple segments contain the same key, we can keep the values from most recent segment and discard the values in older segments. 
+    - No need to maintain a mapping of all keys and file offsets in-memory
+        - You need a sparse in-memory hash map. One key for every few KBs of the segment file because few KBs can be scanned quickly!
+        - For example: If you are searching for the key handiwork and you know the offsets of handbag and handsome, you can start from handbag and scan sequentially from there.
+    - It's possible to group records that need to be scanned in a range in a single block and compress it before it's written to disk. Each entry of the in-memory index points at the start of the compressed block.
+
+### Constructing and maintaining SSTables.
+1. So now our incoming writes occur in any order. 
+2. Maintaining a sorted structure on disk is possible using B-Trees but maintaining it in memory is much more easier. Plenty of data structures you can use such as AVL trees, Red-black trees. With them, you can insert keys in any order and read them back in sorted order.
+3. Our storage engine now works as follows
+    
