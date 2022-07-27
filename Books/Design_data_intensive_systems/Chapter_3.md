@@ -138,4 +138,61 @@
     - LSM trees can sustain a higher write throughput that B-trees because they sometimes have lower write amplification (depending on storage engine configuration & workload) and partly because they sequentially write compact SSTable files rather than overwriting several pages in the tree. Quite imporant on magnetic hard drives where sequential writes are quite faster. 
     - LSM trees can be compressed better to produce smaller files on disk. B-trees do leave some space unused due to fragmentation. LSM trees are not page-oriented and periodically rewrite SSTables to remove fragmentation.
     - Lower write amplification and reduced fragmentation are important on SSDs as well. They allow representing data more compactly to allow more read/write requests within the availaible I/O bandwidth
-3. Downsides of LSM trees 
+3. Downsides of LSM trees
+    - Compaction can sometimes interfere with the performance of reads/writes that are ongoing
+    - Though compaction is performed incrementally by storage engines and without affecting concurrent access, disk have limited resources so at higher writes rate, a read request may need to wait while the disk finishes an expensive compaction operation. 
+    - B-tress can be more predictable as compared to LSM trees when it comes to read response time for queries.
+    - At high write throughput, the disk's finite write bandwidth needs to be shared between initial write and compaction threads running in background. Bigger the database, more disk bandwidth is required for compaction. 
+    - If write throughput is high and compaction is not configured properly, compaction cannot keep up with the rate of incoming writes. The number of unmerged segments keeps on increasing until you run out of disk space and reads also become slower.
+    - You need explicit monitoring to detect the situation of compaction being unable to keep up. There is no SSTable based throttling.
+    - For B-trees, a key exists in exactly one place. LSM storage engine stores multiple copies of a key at different segments. B-trees are great for transactional semantics with isolation being implemented as a lock on a range of keys. Those locks can be directly attached to the tree. 
+    - No quick and easy rule for determining which storage engine is better. You should test for your own use-cases.
+
+### Other indexing structures
+1. Secondary index: 
+    - Secondary indexes are very common as primary keys. 
+    - In a secondary index, the index values are not necessarily unique, many rows or documents with the same entry. 
+    - We can make each value in the index as a list of matching row identifiers or making each index unique by appending a row identifier to it.
+    - Both B-Tree and LSM indexes can be used as secondary indexes
+2. Storing values within the index
+    - Queries search for key. A value can be the actual row(document, vertex, tuple in relational DB) or it can be a reference to a row stored elsewhere. Elsewhere means a heap file which stores data in no particular order (may be appedn-only order or may keep track of deleted rows to cleanse them later.)
+    - Heap file approach avoids duplicating data, each location in index just references a location in the heap file.
+    - While updating the value without changing the key, the heap file approach is efficient, rewrite the record in-place provided the new value is not larger than old value. If it's larger, it probably needs to be moved into a new location in the heap where there is enough space. In that case, we either may add a forwarding pointer to this new location or all indexes need to be updated to this new location.
+    - To avoid extra loop, from index to heap file, we may store the indexed row directly within the index. This is known as clustered index. For MySQL's InnoDB engine, the primary key is always a clustered index and secondary key refer to the primary key.
+    - A covering index stores only some of a table's columns within an index allowing us to answe some queries using index alone. In which case, the index is said to cover the query.
+    - Clustered and covering indexes speed up reads but they require additional storage and add overhead on writes
+3. Multi-column indexes: 
+    - Multi-column indexes are used incase you want to query documents/rows using one or more fields simultaenously. 
+    - Concatenated index simply combines several fields into one key with the index definition defining in which order the fields are concatenated. This index is useful only when all columns in the index are used in the query.
+    - Multi-dimensional indexes are a more general way of querying several columns at once. When a user is searching for a restarant on Zomato, the app uses his latitude and longitude to locate restaurants nearby his location. This requires a multi-column range query
+    ```
+    SELECT * FROM restaurants 
+    WHERE latitude BETWEEN 51.4946 AND 51.5079 
+    AND longitude BETWEEN -0.1162 and -0.1004
+    ```
+    - A standard LSM/B-tree tree may not answer that question, it cannot use both indexes simulatenously. We can use a function to translate the 2-D location into a space-filling curve and then use a regular B-tree index. Spatial indexes like R-tree also can be used. 
+    - You can even use a multi-dimensional index in case of an e-commerce website that allows searching products based on color value RGB. 
+    - You can even have a multi-dimensional index on date and temperature to efficiently search all observations during the year 2013 where the temperature was between 25 to 30 degrees. This technique is used by Hyperdex.
+
+4. Full-text and fuzzy indexes: 
+    - Indexes mentioned so far assume you have the exact value to have an exact match or a range of values to do a range query. 
+    - Full-text/fuzzy indexes allow to search for similar keys, misspelt words. 
+    - Full text search engines commonly allow  synonyms, ignore grammatical variations of a word and to search for occurences of words near each other in the same document. 
+    - Lucene is able to search text for words within same edit distance. An edit distance of 1 means one letter has been added, removed, replaced.
+    - Lucene uses a SSTable like structure for it's term dictionary. This requires a small in-memory index that tells queries at which offset in the sorted file to look for the query. This in-memory index is a finite state automaton over the characters of the keys. This can be tranformed into the Levenshtein automaton which supports efficient search for words. 
+    - Other fuzzy search techniques go in the direction of document classification and machine learning.
+
+5. Keeping everything in memory
+    - Above data structures to store data are answers to the limitations of disks
+    - Data on disk needs to be laid out carefully if you want good performance on reads and writes. But disks have two significant advantages - they are durable and they have a lower cost per GB than RAM.
+    - Many datasets are not that big so it's feasible to keep them entirely in memory potentially distributed across several machines. This led to the development of in-memory databases.
+    - Caches are a good use-case for in-memory databases where it's acceptable for data to be lost even if a machine is restarted.
+    - Durability can be achieved with special hardware such as battery powered RAM, log of changes to disk, periodic snapshots, replicate in-memory state to other machines. 
+    - On restart, it needs to reload it's state either from disk or over the network from a replica. Disk is just used as an append-only log for durability, all reads happen from data in memory
+    - VoltDB, MemSQL and Oracle TimesTen are in-memory DBs with a relational model. RAMCloud is an open-source in-memory key-value store
+    - In-memory DBs are faster because they can avoid the overhead of encoding in-memory data-structures in a form that can be written to disk. 
+    - In-memory DBs provide data models such as Sets, priority queues, sorted sets in Redis that are difficult to implement with disk-based structures. 
+    - In-memory DBs can also be extended to store data larger than than availaible memory. Anti-caching approach works by evicting the least recently used data from memory and loading it back when accessed similar to what an OS does with virtual memory and swap files.Database does it at the granularity of pages. 
+    - Further changes to storage engine design will be if non-volatile memory NVM technologies become more widely adopted.
+
+## Transaction processing
