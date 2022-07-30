@@ -196,3 +196,104 @@
     - Further changes to storage engine design will be if non-volatile memory NVM technologies become more widely adopted.
 
 ## Transaction processing
+1. In earlier days, a transaction consisted mostly of business transactions, paying an employer's salary, making a sale, order. Soon databases expanded into areas that did'nt involve money changing. The word "transaction" stuck, referring to a group of reads/writes forming a logical unit.
+2. Transaction processing just means allowing clients to do low latency reads/writes as opposed to batch processing jobs. The basic access pattern for databases remained the same whether they are used for blog posts, comments, contacts. 
+3. Look up a small number of records by some key, records are updated/inserted based on user's input. Because these applications are interactive, the access pattern is known as online transaction processing (OLTP)
+4. Analytics is a different use-case for databases. An analytics query scans through a huge number of records, rows and columns and calculates aggregate statistics. For example:
+    - What is the total value of the renevune generated in Jan 2022? 
+    - How many more articles did we sell during our promotion than the average value
+ Analytic reports drive business decisions (business intelligence). This pattern of querying and DB use is called online analytics processing (OLAP)
+5. Differences between OLAP and OLTP
+
+```
+                                OLAP                                 OLTP
+Read Pattern  Small number of records by key           Aggregated over large number of records
+
+Write Pattern Random access, low latency, writes        Bulk import i.e ETL/event stream
+            from user input
+
+
+Used by      End customers/users/web applications       Internal analysts for decision support
+
+What data       Latest data current points in time      History of events
+represents
+
+Dataset size    GB to TB                                  TB to PBs
+
+```
+
+6. There was a trend since 1980s for companies to stop using their OLTP databases running SQL for OLAP purposes. Have a separate database for running them. This is called as a Data warehouse.
+
+### Data warehousing
+1. An enterprise has dozens of transaction processing systems which are complex and each system needs a team of people to maintain. The systems end up being mostly operating in an autonomous manner from each other. 
+2. These OLTP systems are expected to be highly availaible to process transactions with a low latency. Since OLAP queries are often expensive, scanning large parts of the database, this can hamper concurrently executing OLTP transactions. 
+3. Data warehouse is a separate database that analysts can query without affecting OLTP transactions. It contains read-only data from various OLTP systems in the company. 
+4. Data is extracted from the OLTP databases and loaded to these OLAP databases periodically or as a continous stream of updates. We need to first transform this data into an analysis-friendly schema though. This process of getting data into the warehouse is called Extract-Transform-Load (ETL)
+5. OLAP is common in large companies. But for small companies it might be an overkill which can use a small data stored in conventional SQL database. Such data can be pasted in a spreadsheet for analysis. 
+6. The Data warehouse database schema can be optimized according to analysis access patterns. 
+
+#### Divergence between OLTP and data warehouse
+1. Data model of a warehouse is mostly SQL i.e relational. 
+2. On the surface, the DB of a warehouse and OLTP database may look the same since both use SQL. Internals differ vastly for analytic and OLTP workloads. Most database support either OLTP or OLAP but not both. Microsoft SQL server and SAP HANA have support for both but they are becoming two separate query and storage engines accessible through the common SQL interface.
+3. Data warehouse vendors sell their systems under expensive commercial licenses. More recently, many open-source SQL-on-Hadoop have emerged.
+
+#### Star and Snowflake Schemas
+1. Star-Schema or Multi-dimensional modelling: 
+    - We have a separate fact table that represents all events that occurred at a particular point in time. Such a table is highly denormalized, contains many columns and foreign keys relating to the original parent tables. 
+    - For example: Below xample of fact table for a grocery retailer
+    ```
+    date_key | product_id | store_id | customer_id | promotion_id | quantity | price
+    --------------------------------------------------------------------------------------
+    ```
+    - Facts are captured as individual events which allows great flexibility. 
+    - While some columns are attributes the others are foreign keys references to other tables called dimensions. 
+    - Each row in the fact table represents an event and the dimensions represent the who, what, where, when, how and why of that event. Even date/time are represented using dimension tables allowing to differentiate between events on holiday, non-holiday, weekend, festive season.
+    - Star schema name is derived from the fact that when table relationships are visualized as. Fact table is in the middle surrounded by dimension tables resembling a star.
+
+2. Snowflake schema: 
+    - Dimensions are broken down into sub-dimensions. 
+    - For example: separate tables for brands and product categories and each row in the products table contains a foreign key to them. 
+    - Snowflake schemas are more normalized than star schemas but often star schemas are easier to work with. 
+
+Typically, Fact tables are very large containing 100s of columns and rows and dimension tables also can be large too. 
+
+## Column Oriented storage
+1. If we have trillions of rows and petabytes of data in fact tables, storing/querying them efficiently becomes a problem.
+2. Although fact tables are over a 100 columns wide, a typical data warehouse query needs to only access 4 or 5 of them at a time. (SELECT *) is rarely needed. 
+3. OLTP databases layout storage in a row-oriented fashion. All values of the rows are stored next to each other. Document databases are typically similar. An entire document is stored as one contiguous sequence of bytes. 
+4. For each analytics query we typically pick 3 or 4 columns and aggregate on them. Still we need to load all thse 100s of rows from disk to memory, parse and filter out those that don't meet the required conditions.
+5. Column oriented storage does'nt store all values of a row together. Each column is stored in a separate file and a query only needs to read and parse those columns in use in that query. 
+6. This layout relies on each column file containing the same rows in the same order. 
+7. Column compression
+    - We can further reduce the demands on disk throughput by compressing data. Column oriented storage lends itself well to compression. 
+    - Depending on data in the column different compression techniques can be used.  One technique is bitmap compression. We can take a column with n distinct values and turn it into n separate bitmaps. One bitmap for each value, one bit for each row. The bit is 1 if the row has that value and 0 if not.
+    - If n is bigger, there will be a lot of 0s in most of those bitmaps (sparse) in which case they can be run-length encoded. 
+    - For example - below query
+        ```
+        WHERE product_sku IN (30, 60, 59)
+        ```
+     Computes the bitmaps of these 3, calculates the bitwise OR of those 3 bitmaps 
+8. Cassandra/HBase that descend from the Big Table model, have column families that store all columns of a row together with a row key and compression is not used. Thus, all databases that descend from the Big Table model are mostly row oriented.
+
+### Memory bandwidth and vectorized processing
+1. Main challenge in analytics databases is the bandwidth for getting data from disk to main memory. 
+2. Other challenges include about efficiently using the bandwidth from main memory to CPU cache, avoid branch misprediction, bubbles in the CPU pipeline, making use of SIMD instructions.
+3. Column oriented storage also make efficient use of the  CPU cycles. 
+4. We can take a chunk of compressed column that fits nicely into the the CPU's L1 cache, and iterate it. CPU can execute a loop faster than code. Column compression allows more rows from a column to fit in L1 cache. Bitwise operators like AND/OR operate on such chunks of data directly.This is called vectorized processing.
+
+### Sort order in column store
+1. Does'nt necessarily matter, it's easiest to store in the insert order.
+2. Each column cannot be sorted independently since we can construct a row because we know that the kth item in one column belongs to the same row  as the kth item in another column.
+3. DB administrator can choose the columns depending on their knowledge of common queries. If queries often target date ranges, date_key can be the primary sort column. A second column can determine the sort order of any rows having same value in the primary sort column
+4. Sorting helps in the compression of columns. If the primary key column does'nt have many distinct values, we can apply a run-length encoding to compress the column to a few KBs. Compression effect is the strongest on the primary sort column. 
+5. Several different sort orders:
+    - Different queries benefit from different sort orders so same data can be stored in different ways. 
+    - Can store the same data in different sorted ways and use the one that best fits the query pattern. 
+
+### Writing to Column-oriented storage:
+1. Column oriented storage, compression and sorting makes read queries faster because of the load of large read-only queries performed by analysts. But it affects the writes. 
+2. B-tree-like in-place writes not possible. To insert a row in the middle of the sorted table would require a rewrite the rows after that. Rows are identified by their positions within a column, insertion has to update all columns consistently. 
+3. LSM tree can be used. All writes go to an in-memory store to be added to a sorted structure prepared for writing to disk. It does'nt matter if the in-memory store is row or column oriented. When enough writes accumulate, they're merged with the column files on disk and wrriten to new files in bulk.
+4. Query optimizer hides the distinction between column data on disk and recent writes in memory and combines the two. Data that has been modified is immediately reflected in the sub-queries.
+
+### Aggregation - Data cubes and materialized views.
