@@ -297,3 +297,20 @@ Typically, Fact tables are very large containing 100s of columns and rows and di
 4. Query optimizer hides the distinction between column data on disk and recent writes in memory and combines the two. Data that has been modified is immediately reflected in the sub-queries.
 
 ### Aggregation - Data cubes and materialized views.
+1. One more use-case of a data warehouse is a materialized aggregate. 
+2. Data warehouse functions often involve aggregate functions like SUM(), MIN, MAX.
+3. It's very helpful to cache some of the counts/queries used most often. One of creating such a cache is a materialized view. A materialized view is often an actual copy of the query result written to disk.
+4. On the other hand, when you read from a normal SQL Virtual view, the SQL engine expands the view's underlying query and processes the expanded query. 
+5. When underlying data changes, a materialized view needs to be updated but it's often expensive and hence materialized views are not used in OLTP dtabases. For read-heavy data warehouses, they make more sense.
+6. Data cube or OLAP cube is a special case of a materialized view. It's a grid of aggregates grouped by different dimensions. For example:
+    ```
+                product sku
+
+    date        30      32      33      34          total
+    14-02-2001  128     345     344     566         455
+    15-02-2001  118     145     144     366         255
+
+
+    ```
+7. The advantage of a data cube is that certain queries become very fast because they've been precomputed. For example: to know the total sales per store, you just need to look at the totals along the appropriate dimension, no need to scan millions of rows. 
+8. The disadvantage it has is there is no way of having same flexibility as raw data. Most data warehouses therefore try to keep as much as raw data as possible and use aggregates as a performance boost for certain queries.
