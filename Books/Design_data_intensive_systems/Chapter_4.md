@@ -182,3 +182,90 @@ This depends on the context in which Avro is used
     - Client application running on user's devices making requests to a service over HTTP. 
     - One service making a request to another service often located within the same data center as a part of a service oriented architecture. Software supporting this kind of use-case is sometimes called as middleware.
     - One service making requests to services owned by different organizations. This category includes public APIs, OAuth, credit card processing systems.
+4. Two approaches to web services - REST & SOAP. Diametrically opposite in terms of philosophy
+5. REST 
+    -   is a design philosophy  that builds upon the principles of HTTP. 
+    -   It emphasizes simple data formats using URLs for identifying resources and using HTTP features for cache control, authentication, content type negotiation. 
+    -  REST is gaining popularity over SOAP at-least in cross-organizational service integration and is associated with microservices.
+6. SOAP
+    - XML-based protocol for making network API requests. 
+    - Used over HTTP but aims to be indepedent of HTTP and avoids using most HTTP features
+    - Covers multitude of related standards WS-*
+    - WSDL is an XML-based language describing the API of the SOAP web service.
+    - WSDL enables code generation so that a client accesses a remote service using local classes and method calls.
+    - Integration with SOAP services is difficult, interoperability between various vendor implementations causes problems. Fallen out of place in smaller companies although it still continues to be used in large enterprises for certain legacy APIs. 
+7. RESTful APIs favor simpler approaches, typically involve less code generation and automated tooling. 
+8. Swagger is an OpenAPI specs that can be used to define RESTful APIs. 
+
+#### The problems with RPCs.
+1. Web services to make network calls to do API requests received a lot of hype but have serious interoperability problems.
+2. EJB, Java RMI limited to Java, CORBA is excessively complex, DCOM model is limited to Microsoft.
+3. RPC (Remote Procedure call) is the basis for all of them. The RPC model tries to make a remote network service call look similar to calling a function locally within the same process. This is called location transparency.
+4. RPC is convinient but fundamentally flawed.
+    - Local function calls are predictable and can fail due to a known set of reasons. Network calls are unpredictable and can fail due to several reasons - machine down, network outage. Have to anticipate them and apply a retry mechanism
+    - A local function calls either returns or throws an exception or never returns (infinite loop). A network request has another outcome timeout. No way of knowing why it timed out is the remote service down?
+    - It may happen if you retry a failed request, the previous request got through, only you did'nt get a response. Unless you build a dedup mechanism to ensure idempotence, retrying will cause action to perform twice. 
+    - Local function call normally takes the same time to execute. Network request is often slower and the latencies might be wildly variable depending on how much network congestion is.
+    - The marshalling/unmarshalling of large objects into a sequence of bytes to be sent over the network can be inefficient and problematic depending on the serialization used.
+    - The RPC procedure might be written in a different language rather than it's caller and different languages have different types. The data-type translations might bring about issues.
+5. It's of no use to trying to make a remote service look too much to be like a local object in your programming language. Both are fundamentally different things. 
+6. REST does'nt try to hide the fact that it's a network (people still build RPC libraries atop REST!)
+
+#### Current directions for RPC
+1. RPC is'nt going to go away, various RPC frameworks have been built on the top of Thrift, Protobuf, Avro.
+    - Thrift/Avro comes with RPC support included
+    - gRPC uses Protocol Buffers
+    - Finagle uses Thrift
+    - REST.li uses JSON over HTTP
+2. New generation of RPC frameworks discussed above make it more explict that a remote request is different than a local request.Finagle and REST.li uses futures to encapsulate async actions. gRPC supports streams which consist of a series of request-responses over time. 
+3. Some frameworks also support Service Discovery, allowing to find a port number and IP where a particular service is running. 
+4. JSON over REST achieves less performance as compared to RPC protocols supporting a binary encoding format. However, REST has several advantages
+    - Good for experimentation & debugging
+    - Supported by all mainstream programming languages and platforms
+    - Vast ecosystem of tools availaible supporting it (servrs, caches, load balancers, proxies, firewalls, monitoring tools)
+5. REST is therefore a predominant style for public APIs. Whereas for services running in the same datacentre of the same organization, RPC protocols work good.
+
+#### Data encoding & evolution for RPC.
+1. In terms of evolvability, it's important that RPC clients and servers be changed and deployed independently. 
+2. In case of dataflow through services: it is resonable to assume that all the servers be updated first and then clients. So we need backward compatibility on requests and forward compatibility on responses.
+3. The backward and forward compatibility of an RPC schema are inherited from it's encoding.
+    - Thrift, gRPC and Avro RPC can be evolved according to the compatibility rules of the format.
+    - SOAP has some subtle pitfalls depending on its XML SOAP schema. 
+    - For RESTful APIs, adding optional request/response parameters are usually considered changes that maintain compatibility.
+4. A service provider has no control over it's clients and cannot force them to upgrade. Thus, compatibility needs to be maintained for a long time. For a breaking change, the service provider often can maintain multiple API versions of the service.
+5. For versioning, one approach is to pass the version number in the URL or in the HTTP Accept header. For services using API keys to identify a client, another approach is to store a client's requested API version on the server and allow version selection through an admin interface
+
+## Message-Passing Workflow
+1. Asynchronous Message-passing systems (async systems) are somewhat midway between RPC and databases. 
+    - Similar to RPC in that a client's message is delivered to another process with low latency.
+    - Similar to databases in that message is not directly sent via a network connection but is sent to an intermediary called message broker which stores the message temporarily.
+2. Several advantages over direct RPC
+    - Acts as a buffer if the recipient is unavailaible or overloaded. Improves reliability
+    - Can automatically redeliver messages to process that has crashed and recovered after a crash, thus preventing message loss
+    - Avoids the sender needing to know the IP address and port of the receiver.
+    - One message can be sent to several recipients.
+    - Logically decouples the sender from the receiver.
+3. This communication pattern is asynchronouses, the sender does'nt wait for the message to be delivered but simply sends and forget about it.
+
+### Message Brokers
+1. Earlier, commercial broker software from companies like TIBCO, IBM Websphere, webMethods dominated the landscape. These days, free and open source implementations like Kafka, RabbitMQ, ActiveMQ, NATS are becoming popular.
+2. Generally message broker work as follows
+    - One process sends a message to a named topic or a queue and the broker ensures that the message is delivered to one or more consumers. Multiple producers or consumers can produce/consume from same topic.
+    - Don't enforce a data model, a message is just a sequence of bytes so can use any encoding
+    - If the encoding is forward & backward compatible, we have the greatest flexibility to changes publishers and consumers independently.
+    - Need to be careful to preserve unknown fields. 
+
+### Distributed Actor framework
+1. Programming model dealing with concurrency in a single process.
+2. Rather than multithreading and dealing with problems with threads, logic is encapsulated in actors. 
+3. Each actor represents one client or entity and it may have some local state not shared with any other actor. 
+4. It communicates with other actors by message passing in an async way.
+5. Message delivery is not guaranteed and messages could be lost. 
+6. Each actor process a single message at a time so need'nt worry about threads. 
+7. Distributed actor frameworks help scale this model across multiple nodes. Same message passing model is used whether on single server or multiple server
+8. Location transparency works a better way because the framework assumes that messages can be lost.
+9. A distributed actor framework integrates a message broker with actor programming model. Still need to consider compatibility if you want to perform rolling upgrades.
+10. 3 popular actor frameworks
+    - Akka: Uses Java serialization by default, however we can replace it with Google Protocol buffers.
+    - Orleans: Supports rolling upgrades using versioning mechanisms
+    - Erlang OTP
