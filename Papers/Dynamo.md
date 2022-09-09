@@ -315,3 +315,71 @@ performance, availability and durability. N determines durability. W and R impac
 operation is not affected by the performance of the durable write operation performed by a single replica.
 
 ### Ensuring uniform load distribution
+1. Dynamo uses consistent hashing to achieve a uniform load distribution by partitioning its key space in a uniform manner. Of course assuming there are no skewed key distributions.
+2. Even when there is significant skew in the access distribution, there are enough keys in the popular end of the database so that the load of handling popular keys can be spread uniformly.
+3. How Dynamo DB's partitoning strategy evolved over time
+4. Partition Strategy 1: T Random tokens per node and partition by token value
+    - What it is
+      - Each device assigned T random tokens from the hash space
+      - Tokens of all nodes are ordered according to their values.
+      - Every two consecutive tokens form a range
+      - The highest value token wraps around the lowest value token 
+      - The ranges vary in size
+      - As nodes join and leave the system, the token set changes and consequently the ranges change.
+      - Space needed to maintain the membership at each node increases linearly with the number of
+        nodes in the system
+    - Drawbacks
+      - A new node joining the system takes it's keys from the other nodes. The scans that the other nodes have to perform on their local peristence stores to retrieve these keys are resource intensive especially in a production environment. This requires us to run the bootstrapping task at the lowest priority. During a shopping season with millions of requests coming it, it takes days to complete this.
+      - When a node joins/leaves the system, the Merkle trees for them have to be recomputed/recalculated which is again a resource intensive task.
+      - In this scheme, archiving the entire key space requires us to retrieve the keys from each node separately, which is highly inefficient.
+      - The fundamental issues is that the schemes for data partitioning and data placement are intertwined. To handle an icrease in load, it's preferred to add more nodes to the system. Ideally, it is desirable to use independent schemes for partitioning and placement
+
+5. Partition strategy 2: T Random tokens per node and equal size partitions
+    - What it is:
+      - Hash space is divided into Q equal size partitions and each node is assigned T random tokens
+      - Q is chosen such that Q >> N and Q >> S * T where S is the number of nodes in the system. 
+      - In this strategy, the tokens are only used to build the function that maps values in the hash space to the ordered lists of nodes
+      - A partition is placed on the first N unique nodes that are encountered while walking the consistent hashing ring clockwise from the end of the partition.
+      - It decouples the partitioning and partition placement and enables the changing of partitioning scheme at runtime.
+6. Partition Strategy 3: Q/S tokens per node and Q equal sized partitions
+    - What it is
+      - Similar to strategy 2.
+      - stores Q/S tokens per node.
+      - On leaving the system, a node's keys are distributed randomly among the remaning nodes that satisfy this property.
+      - When a node joins the system it "steals" tokens from nodes in the system in a way that preserves these properties
+
+### Client driven or server driven coordination
+1. Dynamo has a request coordination component that uses a state machine to handle incoming requests.
+2. Requests are uniformly assigned to a node by the load balancer. Read requests can be taken up by any coordinator node. 
+3. Write requests on the other hand will be coordinated by a node in the key’s current preference list. This is due to preferred nodes have the added responsibility of creating a new version stamp that causally subsumes the version that has been updated by the write request. Had it been on the basis of physical timestamp, any node can be used to take in the write request.
+4. As an alternative approach, we can even move the request coordination state machine to client nodes. 
+5. A client can randomly reach out to any Dynamo node to download it's current view of Dynamo membership state. Using this information, the client can determine which set of nodes form the preference list. 
+6. Read requests can be coordinated at the client node avoiding the extra hop that is incurred if the request was assigned to a Dynamo node by a load balancer. Writes can be forwarded to a node in the key's preference list or coordinated locally if Dynamo is using timestamps based versioning.
+7. For a client-driven coordination, we no longer require a load-balancer.
+8. Efficiency of a client-driven coordination depends on how fresh the membership information is at the client side. 
+9. A client polls the Dynamo nodes every 10 seconds. A pull based approach scales better for a large number of clients. If a client detects it's membership information stale (if certain nodes are unavailaible), it will immediately refresh it's membership information.
+
+### Divergent versions - When & how many
+1. Divergent versions occur in two scenarios. 
+  - The first is when the system is handling failure scenarios such as node failures, data center failures. 
+  - The second is when the system is handling a large number of concurrent writers. 
+2. If divergent versions canot be reconciled by vector clocks, they should be reconciled by application logic through semantic reconciliation and this introduces additional load for services. 
+3. Increase is number of divergent versions is due to increase in number of concurrent writes. The increase in number of concurrent writes is usually triggered by robots (automated client programs)
+
+### Background Vs Foreground tasks
+1. Early dynamo nodes performed several background tasks (hinted hand-off, anti-entropy, replica syncs) along with foreground tasks for get() and put() operations. 
+2. Background tasks interfered with the performance of get() and put() due to resource contention. It became necessary to run them when the regular operations were not critically affected.
+3. Background tasks were integrated with an admission control mechanism. This controller helps reserve time slices of the resource (eg database) shared across all background tasks. 
+4. A feedback mechanism is in place to decide on the slices based on the monitored performance of the foreground tasks.
+5. The admission controller constantly monitors aspects included latencies for disk operations, failed database access due to contentions, transaction timeouts and request queue wait times. 
+6. This information is used to check whether the percentiles of latencies or failures are close to a desired threshold. For example: the background controller checks to see how close the 99th percentile read latency is to a preset threshold (over 60 seconds)
+7. The controller uses such comparisons  to assess the resource availaibility for the foreground operations. This info is used to determine the how many time slices will be availaible to background tasks. 
+
+### Discussion and conclusion
+1. Many Amazon internal services have used Dynamo for the past two years and it has provided significant levels of availability to its applications.
+2. Applications have received successful responses (without timing out) for 99.9995% of its requests and no data loss event has occurred to date.
+3. Provides N, R , W to tune the instance on the basis of application needs. 
+4. Amazon's platform is built for high availaibility and different applications are designed to handle different failure modes and inconsistencies. Porting such applications to Dynamo was simple.
+5. For newer applications require some analysis to pick the right conflict resolution mechanisms meeting the business use cases
+6. Dynamo adopts a full membership model where each node is aware of the data hosted by its peers. each
+node actively gossips the full routing table with other nodes in the system. This works well for a couple of 100 nodes. But scaling to 10,000 nodes is a chalenge because of the overhead in maintaning the routing table. This limitation can be overcome by having hierarchical extentions to Dynamo.

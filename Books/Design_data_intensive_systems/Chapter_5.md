@@ -226,4 +226,152 @@ Nodes in the system can go down due to planned maintainance (security patches). 
     - Some kinds of conflicts are subtle to detect. For example: A meeting room booking application should'nt allow overlapping booking for a same room. Even if application checks for availaibility, if the two bookings are done on two different leaders, there can be a conflict.
 
 ### Multi-leader replication topologies
+1. A replication topology describes the communication paths along which writes are propagated from one node to another.
+2. With more than 2 leaders various different topologies are possible. 
+    - All-in-all topology:
+        - Every leader sends its writes to every other leader.
+    - Circular topology:
+        - Each node receives writes from one node and forwards those writes to one other node. 
+    - Star topology:
+        - One designated root node forwards writes to all other nodes.
+3. In circular/star topologies to prevent infinite replication each node is given a unique identifier and the replication log, each write is tagged with the identifiers of all nodes it has passed through. A node receiving a data change tagged with it's own identifier, that data change is ignored. 
+4. A problem with circular/star topologies is that if one node fails, it can interrupt the flow of replication messages. The reconfiguration of the topology to work around the failed node is manual. 
+5. All in all is pretty densely connected, messages can travel different paths. All-in-all has issues too. Some network links are faster than the others and so some replication messages might overtake others which may lead to causality issues eg. update of a row that never existed because update arrived first than insert on that replica. Simply attaching a timestamp to every write is not sufficient, because clocks cannot be trusted to be in sync.
+6. We use version vectors to take care of the casual ordering.
+7. Conflict detection techniques are poorly implemented in many multi-leader systems. 
+8. If using multi-leader replication, it's worth being aware of these issues, carefully reading the documentation and thoroughly testing the database to ensure it provides the guarantees you require for your application.
 
+## Leaderless replication
+1. Single Leader / multi-leader replication systems are based on the idea that a client sends a write request to one node (the leader) and the database takes care of copying that write to other replicas. Leader determines the order in which writes are to be processed and followers apply the writes in the same order. 
+2. Certain data storage systems allow any replica to accept writes from client. Dynamo (in-house by Amazon), Riak, Cassandra, Voldemort are open source data stores with leaderless replication models. 
+3. Either a client can redirect it's writes to several replicas or a coordinator does this on behalf of the client. The coordinator does'nt enforce a particular ordering of writes.
+
+### Writing to the database when a node is down
+1. If you have a database system with 3 replicas and one of them is currently down (perhaps rebooted after installing a system update), for a leader based replication if you need to keep processing writes, you may need to perform a failover. 
+2. Fail-over does not exist for a leaderless replication. The client sends the writes to 3 replicas in parallel. One misses it. If it's sufficient for 2 out of 3 replicas to ack the write, after the client gets two successful responses, we consider the write successful.
+3. If the unavailaible node, comes back online, it misses the writes. So if any client tries to read from it, it will get stale values as responses. 
+4. To solve this, the read requests are also sent in parallel to several nodes. The client gets several different responses. Version numbers identify which values are newer. 
+
+### Read repair and anti-entropy
+1. Replication must ensure all data is eventually copied to every replica. 
+2. Two mechanims are used in Dynamo 
+    - Read repair:
+        - A client sends several read requests to all replicas in parallel
+        - It can detect any stale responses.
+        - It writes the newer values to those replicas returning stale values
+        - This works well for values that are frequently read.
+
+    - Anti-entropy:
+        - Some datastores have background processes that constantly looks for differentces between replicas and copies missing data from one replica to another. 
+        - This does not uses replication logs and data is not copied in any particular order. 
+        - There may be significant delay before the data is copied. 
+
+### Quorums for reads & writes
+1. If every successful write is guaranteed to be present on at-least 2 out of 3 replicas, 1 replica can be stale.
+2. If we read from at-le
+ast 2 replicas, we can be sure that at-least one of them is up-to-date. If the third replica is down or slow, reads can still continue to return an up-to-date value.
+3. Generalizing it. If there are n replicas, every write must be confirmed by w nodes to be considered successful and we require r nodes at-least for every read. 
+4. As long as w + r > n, we expect an up-to-date value when reading because at-least one of r nodes we're reading from must be up to date.
+5. Reads and writes obeying these r and w values are called quorum reads and writes. 
+6. Dynamo has n, r and w configurable. A common choice is to make n and odd number and w = r  = (n  + 1) / 2 rounded up. 
+7. There may be more than n nodes in a cluster but any given value can be stored on n nodes. This allows dataset to be partitioned supporting datasets that are larger to fit on node node. 
+8. The quorum condition w + r > n allows the system to tolerate unavailaible nodes as follows
+    - if w < n, we can still process writes if certain node(s) are unavailaible.
+    - if r < n, we can still process reads if certain node(s) are unavailaible
+    - N = 3, R = W = 2, we can tolerate 1 unavailaible node. 
+    - N = 5, R = W = 3, we can tolerate 2 unavailable nodes. 
+    - Reads and writes are sent to all replicas n in parallel. W and R determine for how many nodes we wait for i.e. how many among the n nodes need to report success before we consider the read/write to be successful. 
+    - If fewer than w or r nodes are availaible, writes/reads return an error. 
+
+### Limitations of quorum consistency
+1. For every read to return a latest written value, we must have w + r > n. The set of nodes to which we've written and the set of nodes from which you'll read must overlap.
+2. Quorums may not be necessarily majorities - it only matters if the set of nodes used by read/write operations overlap by atleast one node. Other quorum assignment algorithms are possible. 
+3. W and R can be set to smaller numbers (w + r <= n). In this case, it's more likely that your read did'nt return the latest value. On the positive side, this configuration allows lower latency and high availaibility.  
+4. Even with w + r > n, there are  few likely edge cases. Possible scenarios
+    - If a sloppy quorum is used, the w writes may end up on different nodes than the r reads so there is no longer an overlap.
+    - If writes occur concurrently, not clear which happenend first. The solution here is to merge the concurrent writes. If a winner is picked on the basis of the timestamp (last writes win), the writes can be lost due to clock skew. 
+    - Writes happening concurrently with a read may be reflected on only some of the replicas. Undetermined whether the read should return the new value or old value
+    - If a write succeeds on less than w replicas, it's not rolled back on the ones where it succeeded. If a write is reported as failed, subsequent reads may or may not return the value from that write.
+    - If a node carrying a new value fails, and it's data is restored from a replica having an old value, the quorum condition may fail.
+    - Even if everything is working correctly, there are edge cases where we can get unlucky with the timing. 
+5. Although quorums appear to return the latest value, at times it's not so simple. The parameters w and r allow to adjust the probablity of stale values being read but they should not be taken as absolute guarantees. 
+6. We don't get guarantees (Read your own writes, monotonic reads, consistent prefix reads) in this. Stronger guarantees require transactions or consensus.
+
+### Monitoring staleness
+1. It's very important to monitor replication health and whether the database can return uptodate values.
+2. If replication falls behind significantly, it should alert so you can investigate the cause. 
+3. For leader based replication, the database exposes some metrics for the replication lag, which could be feeded into a monitoring system. 
+4. For leader based replication since writes are applied in same order on leader and folowers, each follower has a position in the replication log. We can substract the leader's position and the follower's position to get the replication lag.
+5. For leaderless replication, no fixed order of writes making monitoring difficult. Databases can only use read repair (no anti-entropy), there is no limit on which how stale the value can be. 
+6. Some research has gone through in measuring staleness on the basis of w, r and n but not in common practise.
+7. Eventual consistency is a deliberately vague guarantee. For operability, it is important to quantify "eventual".
+
+### Sloppy quorums and hinted handoff
+1. Quorums as described so far may not be as fault-tolerant as they could be. Network interruptions could cut a client off from large number of database nodes. 
+2. In such situations it's likely that fewer than w or r nodes remain so that client can no longer reach a quorum. 
+3. In a large cluster, it's likely the client can connect to some database nodes during network interruption but not to the nodes it needs to assemble a quorum for a particular value. In that case, we face a trade-off. 
+    - Is it better to return errors to all requests to whom we cannot reach w or r nodes?
+    - Should we accept all writes anyway and write them to some nodes that are reachable but are'nt among the n nodes on which the value usually lives? 
+4. The second option is called sloppy quorum. Writes/reads require w and r successfull responses but those may include nodes not among the designated n home nodes. 
+5. Once the network interruption is fixed, any writes that one node temporarily accepts on behalf of another node are sent to the appropriate home node. This is called hinted handoff. 
+6. Sloppy quorums ensure write availaibility, but they may not guarantee the latest value of a key to be returned because it may have been temporarily written to noddes outside of n. 
+7. Sloppy quorums are common in all Dynamo implementations. In Riak, they are enabled by default. 
+
+### Multi-data center operation: 
+1. Leaderless replication is also suitable for multi-datacenter operation since it's designed to tolerate conflicting concurrent writes, network interrupts and latency spikes
+2. Cassandra/Voldemort implemtent their multi-datacenter support within normal leaderless model. The n replicas include nodes in all datacenters and in the configuration, you can specify how many of the n replicas you want to have within each data center. 
+3. A write is sent to all replicas regardless of datacenter but the client usually waits for acknowledgement from a quorum number of nodes within the local datacenter. 
+4. Higher latency writes to other data centers are performed asynchronously although it's configurable.
+
+### Detecting concurrent writes
+1. Dynamo style databases often have to handle concurrent updates to several keys and so conflicts may arise despite the use of strict quorums. 
+2. The problem is that events may arrive in different order at different nodes due to variable network delays and partial failures. To become eventually consistent, replicas should converge to the same value.
+3. Most replication implementations are quite poor in handing this and if you want to avoid loosing data you need to know a lot about the internals of your database's conflict handling.
+4. Discussing few techniques for conflict resolution.
+
+#### Last writes win (Discard concurrent writes)
+1. Declare each replica needs to store most "recent" (provided we have some mechanism of determining which value is recent) value and allow older values to be overwritten or discarded. 
+2. "Recent" is quite misleading. We say that the writes are concurrent and so their order should be undefined. 
+3. Even though, there is no natural ordering on writes, we can force an arbitrary ordering say timestamp. Attach a timestamp to each write, pick the biggest timestamp and discard any writes with an earlier timestamp. This is called Last writes win and is the only supported conflict resolution method in Cassandra. 
+4. Even though this achieves eventual consistency, it's at the cost of durability. Even several concurrent writes to the same key have been reported successfully, only one of the writes will survive. 
+5. In case of caching, LWW may be acceptable. If losing data is not acceptable, LWW is a poor choice. 
+6. The only safe way of using a database with LWW is to ensure that a key is written once and is immutable afterwards totally avoiding concurrent updates. In case of Cassandra, give each write a unique UUID. 
+7. Deciding whether two operations are concurrent - The "Happens-Before" 
+    - If client A's write starts after client B's write and it builds on client B's write, we say A is casually dependent on B. 
+    - If each of client A and client B start the write operation on the same key X not knowing about each other, it's a concurrent operation. We need an algorithm for determining this. 
+8. Because of problems with clocks in distributed systems, it's quite difficult to tell whether two things happened exactly at the same time. The time does not matter, we call two operations as concurrent if they are unware of each other regardless of the physical time in which they occur.
+9. Per the theory of relativity, if two events occuring some distance apart cannot affect each other if the time between the events is shorter than the time it takes for light to travel the distance between them. 
+10. In computer systems, two operations can stilll be concurrent if they occur some time apart from each other, may be due to network prolems preventing one operation from knowing about the other.
+
+#### Algorithm to determine whether two operations are concurrent - Capturing the happens-before relationship (NEED to revisit)
+1. Let's start with a database with one replica. Later on, we could generalize the approach to a leaderless database with many replicas. 
+2. Consider two clients C1 and C2 adding items to the same shopping cart.
+    - Initially shoppoing cart is empty. 
+    - C1 adds milk to the cart. So Cart contents-  {"cart": [{"milk", 1}]} are returned to client C1. The 1 is the version number. 
+    - C2 adds eggs not knowing C1 added milk concurrently. The server adds eggs and milk and eggs are treated as different values in the cart with the version number as 2 So Cart contents-  {"cart": [{"milk", 2}, {"eggs": 2}]} are returned to client C2
+    - C1 now wants to add flour so it sends the request as  {"cart": [{"milk: 1}, {"flour": 1}]} from the previous output it received. The server sees that this value supersedes the previous C1's write of milk but is concurrent with eggs. It assigns both milk and flour the version number 3 but keeps eggs at 2. So Cart contents-  {"cart": [{"milk", 3}, {"eggs": 2}, {"flour": 3}]} are returned to client C1
+    - C2 now wants to add ham unaware that C1 added flour. C2 tries to send [{"milk": 2}, {"eggs": 2}, {"ham": 2}]. Server detects that version 2 overwrites eggs but is concurrent to milk and flour. So it keeps milk and flour at 3 and eggs and ham at 4. So Cart contents-  {"cart": [{"milk", 3}, {"eggs": 4}, {"flour": 3}, {"ham": 4}]} are returned to client C2
+    - Finally C1 wants to add bacon. It received {"cart": [{"milk", 3}, {"eggs": 2}, {"flour": 3}]} and it merges bacon as {"cart": [{"milk", 3}, {"eggs": 2}, {"flour": 3}, {"bacon": 3}]} and sends it to the server. This overwrites milk, flour but is concurrent with eggs, milk, ham and so the server keeps those two concurrent values.
+3. Considering the process in a short way.
+    - Empty Cart: {"cart": {}}
+    - C1 adds milk. Server says ok and returns response {"cart" {"version": 1, "value": [milk]}}
+    - C2 adds eggs not knowing C1 added milk. Server says ok and returns response {"cart" {"version": 2, "value": [milk, eggs]}}
+    - C1 wants to add flour not knowing C2 added eggs. It tries to send {"cart" {"version": 1, "value": [milk, flour]}}. Server says ok and returns response {"cart" {"version": 3, "value": [[milk, flour], [eggs]}}
+    - C2 wants to add ham not knowing C1 added flour. It tries to sends {"version": 2, "value": [milk, eggs, ham]}}
+4. Thus old versions of the value do get overwritten automatically and eventually no writes are lost. 
+5. A textual description of the algorithm is as as follows
+    - Server maintains a version number for every key, increments the version number every time that key is written and stores it along with the value. 
+    - When a client reads a key, the server returns all values that have not been overwritten as well as latest version number. A client must read a key before writing. 
+    - When a client writes a key, it must merge together all values received in prior read and also include the previous version number. 
+    - When the server receives a write, it can overwrite all values with that version number  or below. It must keep the values at a higher version number since they are concurrent with the incoming write.
+
+#### Merging concurrently written values
+1. For the above algorithm, clients need to do extra work. If several operations happen concurrently, clients have to clean up afterward by merging the concurrently written values also called concurrent value siblings. 
+2. We can pick a single value depending on version or timestamp. 
+3. Another approach is to take union. But if you merge two sibling carts and few items have been removed from them, this may not give the right result. To prevent this, we can have the system use a version number to indicate a deleted item. 
+4. It's error prone to handling concurrent sibling merging in application code. There are data structures (Riak's CRDTs) which help to merge siblings in sensible ways handling deletions.
+
+#### Version vectors:
+1. When there are multiple replicas handing writes concurrently, we use version vectors. 
+2. Each replica keeps track of it's own version number and also of the version numers it has seen from other replicas while processing a write. This indicates which values to override and which to keep as siblings.
+3. Version vector is a collection of version numbers from all replicas. 
