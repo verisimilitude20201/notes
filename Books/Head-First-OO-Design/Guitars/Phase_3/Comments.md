@@ -1,3 +1,5 @@
 1. Encapsulation protects information from one part of your applcation from the other parts of your application. In it's simplest form, you can make the data private. But sometimes the information can be an entire class with it's own set of properties.
 2. In this phase, we have moved all search specific properties of a Guitar into it's own GuitarSpec class there by encapsulating out that which varies into a class of it's own. Guitar class need not change even though we may add many more properties to GuitarSpec.
 3. In this way, encapsulation broke apart Guitar and GuitarSpec into two different logical parts. We keep the data in our classes separate from the behavior.
+4. Now every time we add a new property to GuitarSpec, we need to change the Inventory class's search method. This needs to be restructured so that adding a new property to GuitarSpec does'nt change the rest of the application. 
+5. Need to change the search() method in Inventory.java to delegate comparing the two GuitarSpec objects to GuitarSpec class.

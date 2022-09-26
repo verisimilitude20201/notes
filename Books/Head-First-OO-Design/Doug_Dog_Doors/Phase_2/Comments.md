@@ -1,0 +1,4 @@
+1. We have included a Bark recognizer hardware. Every time the dog barks, the owner does'nt have to press the remote control. 
+2. Presently, the bark recognizer will recognize any other bark and open the door. BarkRecognizer class does'nt automatically close the door! We add that code from Remote class and move it to open() method in DogDoor to avoid code duplication.
+3. Here the DogDoorSimulator class which uses the remote to open the door will be an alternate path. Only if the dog is stuck outside of the house will it be used.
+4. We removed the Timer code from Remote class and added it to DogDoor in open method. Duplicate code is always a bad idea.
