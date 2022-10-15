@@ -1,7 +1,7 @@
 public class DogDoor {
     private boolean open;
 
-    
+    private List<Bark> allowedBarks;
 
     public DogDoor() {
         this.open = false;
@@ -22,5 +22,7 @@ public class DogDoor {
         this.close
     }
 
-    
+    public List<Bark> getAllowedBark() {
+        return this.allowedBark;
+    }
 }

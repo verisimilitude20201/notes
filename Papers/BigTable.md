@@ -1,4 +1,6 @@
-# Big Table - A Distributed storage system for structured data
+# Big Table - A Distributed storage system for structured data 
+
+# Current Page 12.
 
 ## Introduction
 1. Big Table is a distributed storage system designed to store structured data capable of scaling upto petabytes stored on commodity servers. 
@@ -155,3 +157,74 @@ memory of the tablet server. This is useful for small pieces of data accessed fr
 2. A Bloom filter allows us to ask whether an SSTable might contain any data for a specified row/column value pair.
 3. A small amount of tablet memory used for storing Bloom filters drastically reduces the number of disk seeks required for read operations.
 4. For non-existent rows or columns, due to use of Bloom filters again there are no disk accesses.
+
+### Commit log implementation 
+1. Mutations are appended to a single log file per tablet server, co-mingling mutations for different tablets in the same physical log. This is to avoid a larger number of concurrent writes in GFS and large number of disk seeks to multiple log files.
+2. Single log file simplifies implementation but complicates recovery. When a tablet server dies, the tablets it served will be moved to other tablet servers. 
+3. One approach would be to read the commit log for the original server and reapply the entries needed for the tablets that it needs to recover. If 100 machines were assigned a single tablet from the failed tablet server, the whole log file would be read 100 times. 
+4. Commit log is sorted by (table, row name, log sequence number). In the sorted output all mutations for a tablet are contiguous and can be read efficiently by one sequential read. 
+5. Writing commit logs to GFS causes peformance hiccups. To protect mutations from GFS latency spikes, each tablet servers has two log writing threads. Only one is active. If writes to the active log file are performed poorly, the log file writing is switched to another thread and the mutations that are in commit log queue are written by the newly active writing thread. 
+
+### Speeding up tablet recovery
+1. When the master moves tablets from a source to target tablet server
+2. The source tablet does compactions on the tablets to reduce the recovery time. After this, it stops serving the tablet.
+3. Before it actually unloads the tablet, it does another minor compaction to removed any uncompated state that arrived while the first compaction was being performed. 
+4. After this, the tablet can be loaded on another tablet server without requiring any recovery of log entries.
+
+### Exploiting immutability
+1. All generated SSTables are immutable. No synchronization of accesses to the file system when reading from SSTables and so concurreny control becomes very simple.
+2. Memtable is the only mutable structure between the readers and the writers. 
+3. Memtable is made copy-on-write to reduce read contention and both readers and writers can access it in parallel.
+4. Obsolete SSTables are GCed. Each tablet's SSTables are registered in the METADATA table. The master removes obsolete SSTables as a mark-and-sweep garbage collection over the set of SSTables.
+
+
+## Performance Evaluation
+1. The sequential write benchmark used row keys with names 0 to R 􀀀 1. This space of row keys was partitioned into 10N equal-sized ranges. These ranges were
+assigned to the N clients by a central scheduler that assigned the next available range to a client as soon as the client finished processing the previous range assigned to it.
+2. A single random string was written under each row key. Each string was randomly generated and so incomprehensible.
+3. The random write benchmark was similar except that the row key was hashed modulo R immediately before writing so that the write load was spread roughly uniformly across the entire row space.
+4. The sequential read benchmark generated row keys in exactly the same way as the sequential write benchmark, but instead of writing under the row key, it read the string stored under the row key.
+5. Random read was similar to the random write benchmark.
+6. Scan benchmark supports the scanning of a range of rows using BigTable API.
+7. Single Tablet Server Performance:
+    - Random reads are slower than all other operations by an order of magnitude or more. Each random read involves the transfer of a 64 KB SSTable block over the network from GFS to a tablet server, out of which only a single 1000-byte value is used.
+    - Random reads from memory are much faster since they are served from local memory.
+    - Random and sequential writes perform better than random reads since each tablet server appends all incoming writes to a single commit log and uses group commit to stream these writes to GFS.
+    - Sequential reads perform better than random reads since every 64 KB SSTable block that is fetched from GFS is stored into our block cache, where it is used to serve the next 64 read requests.
+    - Scans are even faster since the tablet server can return a large number of values in response to a single client RPC.
+8. Aggregate throughput
+    - Aggregate throughput increases dramatically, by over a factor of a hundred, as we increase the number of tablet servers in the system from 1 to 500.
+    - Performance does'nt increase linearly as we increase the number of tablet servers
+    - For most benchmarks, there is a significant drop in per-server throughput when going from 1 to 50 tablet servers. This drop is caused by imbalance in load in multiple server configurations, often due to other processes contending for CPU and network
+    - Load balancing algorithm attempts to deal with this imbalance but cannot do so for two reasons 
+        - Rebalancing is throttled to reduce the number of tablet movements.
+        - Load generated by our benchmarks shifts around as the benchmark progresses.
+
+
+## Real Applications
+1. Google Analytics
+    - It's a service that helps webmasters analyze traffic patterns at their web sites. It provides aggregate statistics, such as the number of unique  visitors per day and the page views per URL per day, as well as site-tracking reports, such as the percentage of users that made a purchase
+    - Webmasters embed a small JavaScript program in their web pages. This program is invoked whenever a page is visited. 
+    - It records various information about the request in Google Analytics, such as a user identifier and information about the page being fetched.
+    - The raw click table (200 TB) maintains a row for each end-user session. The row name is a tuple containing the website's name and the time at which the session was created. This schema ensures that sessions that visit the same web site are contiguous, and that they are sorted chronologically.
+    - The summary table (20 TB) contains various predefined summaries for each website. This table is generated from the raw click table by periodically scheduled MapReduce jobs. Each MapReduce job extracts recent session data from the raw click table
+2. Google Earth:
+    - Google operates a collection of services that provide users with access to high-resolution satellite imagery of the world's surface
+    - These products allow users to navigate across the world's surface: they can pan, view, and annotate satellite imagery at many different levels of resolution.
+    - The preprocessing pipeline uses one table to store raw imagery. During  preprocessing, the imagery is cleaned and consolidated into final serving data. This table contains approximately 70 terabytes of data and therefore is served from disk
+    - Each row in the imagery table corresponds to a single geographic segment. Rows are named to ensure that adjacent geographic segments are stored near each other. The table contains a column family to keep track of the sources of data for each segment. This column family has a large number of columns: essentially one for each raw data image.
+
+3. Personalized Search:
+    - Is an Opt-in service that records user queries and clicks across a variety of Google properties such as web search, images, and news. 
+    - Users can browse their search histories to revisit their old queries and  clicks, and they can ask for personalized search results
+    - Stores each user's data in Bigtable. Each user has a unique userid and is assigned a row named by that userid.
+    - All user actions are stored in a table. A separate column family is  reserved for each type of action (for example, there is a column family that stores all web queries).
+    - Each data element uses as its Bigtable timestamp the time at which the corresponding user action occurred
+    - Personalized Search generates user profiles using a MapReduce over Bigtable which is used for personalizing search results.
+    - The table is now used by many other Google products that store per user configuration options and settings. A quote has been set for each Google Product using the store 
+
+## Lessons
+1. We learned is that large distributed systems are vulnerable to many types of failures, not just
+the standard network partitions and fail-stop failures assumed in many distributed protocols. For example: memory and network corruption, large clock skew, hung machines, extended and asymmetric network partitions,
+bugs in other systems that we are using (Chubby for example), overflow of GFS quotas, and planned and unplanned hardware maintenance.
+2. Some problems were handled by changing protocols (like RPC checksumming) while some others were handled by changing the assumptions made by one part of the system of another part (we stopped assuming a given Chubby operation could return only one of a fixed set of errors) 
