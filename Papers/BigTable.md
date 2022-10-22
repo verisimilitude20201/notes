@@ -1,6 +1,5 @@
 # Big Table - A Distributed storage system for structured data 
 
-# Current Page 12.
 
 ## Introduction
 1. Big Table is a distributed storage system designed to store structured data capable of scaling upto petabytes stored on commodity servers. 
@@ -228,3 +227,6 @@ assigned to the N clients by a central scheduler that assigned the next availabl
 the standard network partitions and fail-stop failures assumed in many distributed protocols. For example: memory and network corruption, large clock skew, hung machines, extended and asymmetric network partitions,
 bugs in other systems that we are using (Chubby for example), overflow of GFS quotas, and planned and unplanned hardware maintenance.
 2. Some problems were handled by changing protocols (like RPC checksumming) while some others were handled by changing the assumptions made by one part of the system of another part (we stopped assuming a given Chubby operation could return only one of a fixed set of errors) 
+3. It is important to delay adding new features until it is clear how the new features will be used. It was planned to add transactions as a part of the Big Table API. However, after examining the actual needs of applications, it's realized that most applications require single-row transactions only. Transactions are however required for maintaining secondary indexes and a specialized mechanism will be added for that.
+4. Having proper system-level monitoring is important as well. Another example of useful monitoring is that every Bigtable cluster is registered in Chubby. This allows us to track down all clusters, discover how big they are, see which versions of our software they are running, how much trafficc they are receiving, and whether or not there are any problems such as unexpectedly large latencies
+5. Keep the code and design as simple as possible.

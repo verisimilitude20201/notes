@@ -262,3 +262,132 @@
     - Execute transactions in a literal serial order
     - 2-Phase locking
     - Optimistic concurrency control techniques such as serializable snapshot isolation.
+5. Let's discuss these techniques in the context of single node transactions.
+
+### Actual Serial execution
+1. Execute only a single transaction at a time, no concurrency at all. We completely sidestep the problem of detecting and preventing conflicts between transactions. 
+2. Database designers fairly recently realized that single-threaded loop for executing transactions was feasible. 
+3. Two main developments caused this rethink
+    - RAM became cheap enough. For many usecases its possible to store to the entire dataset in memory. When all data that a transaction needs is in memory, transactions can execute much faster rather than wait for data to be loaded from disk.
+    - Database designers realized that OLTP transactions are short-lived and only make a short number of reads/writes. Long-running queries are read-only so they can be run on a consistent snapshot outside of the serial execution loop.
+4. A system designed for single-threaded transactions can perform better than a system supporting concurrency because it does not need locking. It's CPU is only limited to a single CPU core. 
+5. To make best use of that single thread, transactions need to be structured differently from their traditional form.
+6. Encapsulate transactions in stored procedures
+    - In the early days of databases, the intention was that an entire transaction could encompass a user activity such as airline booking. DB designers thought it would be neat if it could be a single transaction such that it could be commited atomically. 
+    - This would lead to a lot of wait time because humans are slow to respond. 
+    - All OLTP applications avoid the wait by adopting an interactive style. An application makes a query, waits for the result, then issues another query.
+    - The throughput would be dreadful because the database would spend a lot of its time waiting for the application to issue the next query. It's necessary to process multiple transactions concurrently in order to get reasonable performance. 
+    - Systems with single-threaded serial transactions don't allow multi-statement transactions. The application must submit the entire code to the database ahead of time as a stored procedure. 
+    - Provided that all required data is in-memory, the stored procedure can execute very fast without any network or disk I/O.
+    - Stores Procedures: Pros and Cons
+        - They have been around for quite a long time and they have been included in the SQL standard. They have a bad reputation due to several reasons
+            - Each DB vendor has it's own language for stored procedures, have'nt kept up with developments in general purpose programming languages
+            - Code running in a database is difficult to manage, version control, test and deploy.
+            - A Single database instance is shared among many applications. A badly written stored procedure can cause much more trouble than equally badly written code in an application server.
+        - Modern implementations of stored procedures have abandoned PL/SQL and use existing general-purpose programming languages. For eg: Redis uses Lua. 
+        - Stored procedures and in-memory data makes executing all transactions on a single thread feasible avoiding the need of other concurrency control mechanisms. 
+        - VoltDB uses stored procedures for replication. It requires that stored procedures be deterministic (when run on different nodes, they produce the same result.)
+7. Partitioning
+    - For applications with a high write throughput, single threaded transaction processor can become a bottleneck. Because the transaction throughput is limited to the speed of a single CPU core.
+    - To scale to multiple CPUs, VoltDB supports partioning of data. Each transaction just needa to read/write data within a single partition. 
+    - Each CPU core is given its own partition which allows the linear scaling w.r.t the number of CPU cores. 
+    - Multi-partition accesses need to be coordinated by the database. The stored procedure needs to be performed in lock-step to ensure serializability across the entire system. 
+    - Cross partition transactions are very slower as compared to single partition transactions and their performance cannot be increased by adding more machines.
+    - Often data with multiple secondary indexes is likely to require a lot of cross partition coordination.
+8. Summary of serial execution:
+    - To use serial execution there are certain constraints.
+        - Every transaction should be small and fast.
+        - Limited to use cases where the active dataset can fit in memory.
+        - Write throughput must be low enough to be handled on a single CPU.
+        - Cross partition transactions possible but there is a hard limit to the extent to which they can be used.
+
+### Two-Phase Locking (2PL)
+1. For several years, 2PL was the only way to implement serializability. 
+2. 2PL makes the locking requirements stronger. 
+3. Several transactions are allowed to concurrently read the same object as long as nobody is writing to it. As soon as anyone wants to modify that same object it requires an exclusive access to it.
+    - If transaction A wants to read the object that B has an exclusive write lock on, B needs to wait until A commits/aborts and the lock is released.
+    - Reading an old version of the object is not accetable under 2-PL.
+4. Writers dont just block other readers, they also block other writes as well in 2PL
+5. Snapshot isolation has the mantra readers never block writers and wrters never block readers.
+6. Because 2PL provides serializability, it protects against all the race conditions.
+7. Implementation of 2PL
+    - 2PL is used by the serializable isolation level in MySQL and repeatable read isolation level in DB2
+    - Blocking on readers and writers is implemented by having a lock on each object in the database. It can be in shared mode or exclusive mode.The lock is used as follows
+        - If a transaction wants to read an object, it first acquire the lock in shared mode. Several transactions can hold the shared lock on the object, so if there is any existing lock, the transaction must wait.
+        - If a transaction first reads and then writes an object, it upgrades its shared lokc to an exclusive lock. The upgrade works directly as getting an exclusive lock.
+        - After acquiring a lock, it must continue to hold the lock until the end of the transaction (commit or abort). This is from where the name 2PL comes from; locks are acquired while executing the transaction and released when the transaction completes.
+    - The database automatically detects deadlocks between transaction and aborts one of them so others can make progress
+8. Performance of 2PL:
+    - A big drawback of 2PL is performance throughput and response times of queries are worse under two phase locking and weak isolation.
+    - This is more importantly due to reduced concurrency due to locks. If two concurrent transactions try to do anything that may result in a race condition, one has to wait for other to complete.
+    - Traditional RDBMS don't limit the duration of a transaction because they are designed for interactive applications that await human input. There is no limit on how long a transaction may wait on another and this may form a queue of transactions even if thery are short. 
+    - For this reason, databases running 2PL can have unstable latencies. If there is contention in the workload, it may take one slow transaction or one transaction that acquires many locks to cause the rest of the system to halt.
+    - Deadlocks can happen with the lock-based read commited isolation level, they occur more frequently under 2PL serializable isolation level depending on access patterns of the application.
+9. Predicate Locks:
+    - Phatoms are when one transaction changes the results of another transaction's search query. A database with serializable isolation must prevent phantoms. 
+    - For a booking room example, a second transaction is not allowed to concurrently insert or update another booking for another booking for the same room and time range.
+    - This is implemented using a Predicate locks. Rather than belonging to an object, it belongs to a series of objects (rows) matching some condition. Such as
+    ```
+    SELECT * FROM Bookings WHERE room_id = 123 AND end_time > '2018-01-01 12:00' AND start_time < '2018-01-01 13:00'
+    ```
+    - Predicate lock restricts access as follows
+        - A transaction A wanting to read the objects like in the above SELECT query needs to acquire a shared mode predicate lock on the conditions of the query. If another transaction B has an exclusive lock on any of the objects matching those conditions, A must wait until B releases it's lock.
+        - If transaction A wants to write any object, it must first check if either the new or old value matches any existing predicate lock. If there is a matching predicate lock held by transaction B, A must wait until B has commited or aborted before it can continue.
+    - Predicate locks apply even to those objects that may be inserted in the future.
+    - If two-phase locking includes predicate locks, the database prevents all forms of write skew and so its isolation becomes serializable.
+10. Index-range locks:
+    - If there are many locks by active transactions, checking for matching locks becomes time-consuming. 
+    - Most databases with 2PL implement index-range locking which is a simplified approximation of predicate locking
+    - We can simplify a predicate by allowing it to match a greater set of objects. 
+    - If you have a predicate lock for bookings of room 123 between 12 PM and 1 PM, you can approximate it 
+        - By locking bookings for room 123 any time  OR
+        - By locking all rooms between 12 PM and 1 PM.
+    - Any write that matches the original predicate will also match the approximations.
+    - We would have indexes on room_id and start_end & end_time. 
+    - We can attach a shared lock on room_id to indicate that a transaction has searched for bookings of room id 123
+    - For a time-based index, it can attach a shared lock to a range of values indicating that a transaction searched for bookings that overlap in the time period of 12 PM to 1 PM. 
+    - Now if another transaction wants to insert, update or delete a booking for the same room or time period, it updates the same part of the index. It will encounter the shared lock and it will be forced to wait until the lock is released.
+    - Index-range locks is not precise as predicate locks but since they have much lower overheads they are a good compromise.
+    - If there is no suitable index where a range lock is assigned, the database can fall back on the entire table. This is not good performance wise since it stops all transactions from writing the table but its a safe fallback.
+
+### Serializable Snapshot isolation (SSI)
+1. On one had we have implementations of serializability that don't perform well (two-phase locking) or dont'scale well (serial execution). On the other hand, we have weak isolation levels that have good performance but are prone to race conditions (lost updates, write skews and phantoms)
+2. This brings us a question - Are serializable isolation and performance at odds? 
+3. An algorithm called SSI is very promising and also has a small performance penalty. It's fairly new and is by Micheal Cahill.
+4. Both PostgreSQL since 9.1 single node database and FoundationDB use a similar algorithm.
+
+#### Pessimistic Vs Optimistic concurrency control
+1. Pessimistic concurrency control is based on the principle that if anything goes wrong, it's better to wait till the situation becomes safe again before doing anything. Similar to mutual exclusion to protect data structures in multi-threaded programming. 
+2. Serial execution is pessimism to the extreme, it's equivalent to each transaction having an exclusive lock on the database. We make each transaction very fast to hold the lock for a short time.
+3. Optimistic concurrency control means instead of blocking, if something potentially dangerous happens, transactions might continue anyway in the hope that everything may turn all right. 
+4. On commit the database checks whether everything is all right and if so the transaction is aborted and re-tried. 
+5. Optimistic concurrency control performs badly if there is high contention i.e. many transactions trying to access the same objects. This may lead to higher percentage of aborts and the additional transaction load of retrials can make performance worse.
+6. If there is enough spare capacity and load is not that much, Optimistic concurrency control can perform very well. 
+7. Contention can be reduced with commutative atomic operations. For example: If several transactions concurrently increment a counter, it does'nt matter in which order the increments are applied as long as counter is not read in the same transaction.
+8. SSI is based on snapshot isolation ie. all reads are based on a consistent snapshot of the database. It also adds an algorithm to detect serialization conflicts among writes and determine which transactions to abort.
+
+#### Decisions based on an outdated premise
+1. For write skew under snapshot isolation, there is recurring pattern. A transaction reads some data from database, examines the result of the query and decides to take some action  based on the result it saw. 
+2. However, under snapshot isolation, the result from the original query may no longer be up-to-date by the time the transaction commits.
+3. The transaction is taking action based on a premise that was true at its beginning. Later when it wants to commit, the original data may have changed and the premise becomes false.
+4. The transaction needs to assume that any change in the query result means that the writes in that transaction may be invalid. There may be a causal dependency between the read queries and the writes. 
+5. To provide serializable isolation, the database must detect situations in which a transaction acted on an outdated premise and abort the transaction. How the database knows query results have changed? Two cases
+    - Detecting reads of a stale MVCC object (uncommited write occured before the read)
+    - Detecting writes that affect prior reads (the write occured after the read)
+6. Detecting reads of a stale MVCC object:
+    - Snapshot isolation is implemented by multi-version concurrency control. 
+    - Transaction reading from a consistent snapshot ignores writes made by other transactions that have'nt been commited yet. 
+    - In Alice's case, her transaction checked whether on_call was true which is not since her transaction is uncommited. However, before her transaction commits, Bob's transaction takes effect and Alice's transaction's premise is no longer true.
+    - A database needs to track when a transaction ignores another transaction's writes due to MVCC visibility rules. Before commit, a database checks whether any of the ignored writes have been commited. If so, the transaction is aborted.
+    - We must wait until the transaction commits, because it may be only a read-only transactions. We should avoid unecessary aborts. 
+7. Detecting writes that affect prior reads: 
+    - We discussed index-range locks which allow the database to lock access to all rows matching some search query.
+    - Similar technique can be used here, but SSI does'nt block other transactions.
+    - Bob and Alice transactions both search for on call doctors in shift_id 1234. The shift_id index can be used to record this fact and it can be kept until the transaction has commited or aborted. 
+    - When a transaction writes to an object, it must look in the indexes for any transactions that have recently read the affected data but rather than blocking as in case of locks, it must notifies the Alice and Bob transactions that the data they read is stale.
+8. Performance of SSI
+    - The granularity of the tracking of each transactions read/write affects performance. If we go into great detail, it can be precise about which transactions need to abort. But the bookkeeping overhead becomes evident. Less detailed tracking is faster but it may lead to more aborts.
+    - For some cases, it's okay if a transaction reads information written by another transaction, it's sometimes possible to prove that the result of the transaction is serializable. 
+    - The biggest advantage of SSI compared to 2PL is one transaction does'nt need to block waiting for locks held by another transaction. Read-only queries can run on a consistent snapshot which is appealing for read-heavy workloads.
+    - SSI is not limited to a single CPU core. FoundationDB distributes the detection of serialization conflicts across multiple machines allowing it to scale to very high throughput.
+    - SSI rquires that read/write transactions be fairly short because a transaction that reads and writes data over a long period of time is likely to run into more conflicts and abort, so SSI requires that read/write transactions be fairly short. SSI is less sensitive to slow transactions than two phase locking or serial execution.
