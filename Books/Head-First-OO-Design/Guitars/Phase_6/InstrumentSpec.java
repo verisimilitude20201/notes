@@ -1,16 +1,25 @@
 class InstrumentSpec {
-    private Builder builder;
-    private Type type;
-    private Wood frontWood;
-    private Wood backWood;
-    private String model;
+    private Map<Object, Object> properties;
 
-    public Guitar(String model, Builder builder,
-    Type type, Wood frontWood, Wood backWood) {
+    public Guitar(Map<String, Object> properties) {
         // Initialize all private properties
+        if (properties != null) {
+            this.properties = properties;
+        } else {
+            this.properties = new HashMap<String, Object>();
+        }
+        
     }
 
-    public boolean matches(InstrumentSpec otherSpec) {
+    public Object getProperty(String name) {
+        return properties.get(name);
+    }
+
+    public Map<Object, Object> getProperties() {
+        return this.properties;
+    }
+
+    public boolean matches(Map otherSpec) {
         if(builder != otherSpec.builder) {
             return False
 

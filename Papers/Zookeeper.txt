@@ -1,0 +1,248 @@
+Zookeeper
+---------
+
+1. Abstract: 
+    - Zookeeper is a service for coordinating processes of distributed applications
+    - Aims at providing a simple and high performance kernel for more complex coordination primitives at the client
+    - Incorporates elements from group messaging, distributed lock and shared registers (shared data structure which stores a value and has two operations: read, which returns the value stored in the register, and write, which updates the value stored) in a replicated centralized service.
+    - Zookeeper's interface has wait free aspects of shared registers with an event-driven mechanism similar to cache invalidations of distributed file systems
+    - Zookeeper also provides a per-client guarantee of FIFO execution of requests and linearizability for all requests that change the state. 
+    - Read requests satisfied by local servers
+
+2. Introduction:
+    - Distributed applications have different forms of coordination.
+    - Configuration is one of the basic forms of coordination. Sophisticated systems have dynamic configuration parameters. 
+    - Group membership and leader election are also important in distributed systems, often processes need to know what other processes are alive and what they are allowed to do.
+    - Locks provide a mutually exclusive access to shared resources.
+    - Instead of having the server to implement specific primitives, Zookeeper exposes an API allowing developers to implement their own primitives. Zookeeper is a coordination kernel in that sense that enables new primitives to be added without any changes to its core. 
+    - Zookeeper implements wait-free, non-blocking data objects organized hierarchically in the form of a tree (just as a file system hierarchy). Blocking primitives for a coordination service may cause slower/faulty clients to impact faster clients.
+    - While wait-free is important for fault tolerance and performance, we need order guarantees for coordination operations.
+    - Zookeeper guarantees both linearizability and FIFO client ordering of operations.
+    - Zookeeper service is an ensemble of servers that use replication to achieve high availaibility and performance.
+    - Zookeeper has a pipelined architecture allowing thousands of clients to have thousands of requests outstanding. It guarantees FIFO client order and this allows each client to submit requests asynchronously and have multiple outstanding operations. This feature is desirable cause when a new client becomes the leader, it has to update its metadata. Having multiple outstanding operations reduces the initialization time.
+    - To ensure that writes satisfy linearizability, Zookeeper implements a leader-based atomic broadcast protocol - Zab. 
+    - Zookeeper's workload is dominated by read and to scale read throughput, Zab is not used to totally order them. Reads are served from the local server.
+    - Zookeeper implements a watch mechanism to enable clients to cache data without managing the client cache directly. A client can watch a data object and choose to receive a notification upon an update to that object. It's non-blocking.
+
+3. The Zookeeper service.
+    - Clients submit requests to a Zookeeper service via the Zookeeper client library's API.
+    - Client library also manages the network connections between the client and ZooKeeper servers.
+    - Terminology:
+        - Client denotes a user of the Zookeeper service. 
+        - Server denotes a process providing the Zookeeper service
+        - Znode is an in-memory data node organized in a hierarchical namespace data tree. 
+    - Service Overview:
+        - Zookeeper provides its clients an abstraction of a set of znodes storing client data organized hierarchically in a tree like structure. 
+        - Clients manipulate znodes directly through Zookeeper API.
+        - To refer to a given ZNode, we refer using standard UNIX file-system path notation /A/B/C. All Znodes store data. All Znodes except ephemeral nodes have children.
+        - Two types of Znodes that clients can create 
+            - Regular: Are created and deleted explicitely
+            - Ephemeral: These are created and either removed explicitely or the system removes them if the session in which they got created terminates.
+        - Nodes created with a sequential flag have a monotonically increasing counter appended to their names. If n is the Znode, and p is its parent, the Counter(p) <= Counter(n)
+        - Watches are used to provide notifications of changes in Znode without requiring clients to poll. When a client performs a read with watch flag sets, its a normal read operation but the server promises to notify when the value at the path changes. Watches notify that change has happened but don't provide info on what changed.
+        - Watches are one-time triggers associated with a session, they are unregistered once triggered or when a session terminates.
+    - Data model:
+        - Zookeeper's data model is a hierarchically organized set of z-nodes which is simply a a hierarchically key-value table where the keys are hierarchical
+        - Different applications can allocate their nodes under different sub-trees with different access rights.
+        - Z-nodes map to abstractions of the client application and ususally used to store data required to be used for configuration and coordination.
+        - For example: We can have a simple Z-node called app1 whose children P1, P2, P3 implement a group membership protocol referring to processes within the group. If a process terminates, the group is deleted.
+        - Z-nodes have timestamps and version counters which allows clients to track changes to the node and execute condition updates based on the Z-node's version.
+    - Sessions:
+        - Session is created when a client connects to one of the Zookeeper servers within the Zookeeper ensemble. 
+        - The session has a timeout. Zookeeper considers a session faulty if it does'nt receive anything from a session for more than the timeout.
+        - Session ends when a client closes a session handle or Zookeeper detects that the client is faulty.
+    - Client API    
+        - create(path: str, data: [], flags: int): Creates a z-node in the path with the mentioned data and passed flags. flags allow client to specify if its a regular or ephemeral node and set sequential.
+        - delete(path: str, version: str): Deletes the z-node at the path if its version equals the passed version
+        - exists(path: str, watch: boolean): Enables a client to check whether the z-node exists and allows it to set a watch.
+        - getData(path: str, watch: boolean): Fetches everything related to the z-node including its children, its meta-data, version counter, timestamp. The watch flag gets set only if the z-node exists
+        - setData(path: str, data: [], version: str): Sets the given data to the z-node if the version of the z-node at path matches the passed version
+        - getChildren(path: str, watch: boolean): Gets the names of children of the z-node
+        - sync(path): Waits for all update operations pending at the start of the operation to propagate and commit to all servers.
+        - Each operation has a synchronous and asynchronous version availaible. The synchronous one is used when the client does'nt need concurrent operations so it makes the call and blocks. The asynchronous one is used to have multiple outstanding operations executed in parallel along with other Zookeeper tasks.
+        - Zookeeper guarantees that callbacks for each operation are invoked in order. 
+        - Each Zookeeper request just needs the full path to the z-node, no handles are used.  This enables zero state per client to be maintained on the server.
+        - Each update operation takes a version number and it enables it to perform conditional updates.  
+    - Zookeeper guarantees:
+        - Zookeeper has two basic guarantees:
+            - Linearizable writes: All writes are serializable and respect precedence.
+            - FIFO client ordering: All requests from a client are executed in the order they are sent by the same client.
+        - Original linearizability means that a client is able to have only one outstanding operation at a time. Zookeeper allows multiple outstanding operations for a client and guarantees FIFO ordering of client requests.
+        - Only write requests are linearizable, reads are satisfied locally at each replica.
+        - Consider a system which has a leader commanding over several worker processes. If a new leader is being elected, it has to set a number of config parameters before it takes over and all workers need to be notified of the change in leader. We have two important requirements:
+            - As the new leader changes the config, we don't want workers to start using the config
+            - If the leader dies while making config changes, we don't want workers to use this partial config.
+        - With Zookeeper, a leader can designate a path as "ready" znode and worker processes can start reading configurations when that "ready" znode exists. New leader deletes old "ready" znode, makes config changes and recreates the znode.
+        - Due to the ordering guarantees, if a worker process sees a ready znode, it must also see all configuration changes made by the new leader. 
+        - What happens if a worker process sees that ready exists before the new leader starts making configuration changes? Notifications too have an ordering guarantee. If a client is watching for a change, it will first see the notification before it can see the new state of the system after the change. 
+        - Zookeeper provides a sync request. A Sync request when followed by a read becomes a slow read. It causes a server to apply all pending write requests before processing the read. This avoids seeing different configurations due to some replicas being slightly behind of the most latest ones.
+        - Zookeeper service responds successfully to a change request and that change persists as long as a quorum of servers responds.
+    - Zookeeper primitives:
+        - Zookeeper service knows nothing of these primitives, they are entire implemented using Zookeeper client API.
+        - Even though Zookeeper is wait-free, we can implement efficient locking primitives using just its client API. Ordering guarantees allow to reason efficiently about system state, watches allow for efficient reasoning.
+        - Configuration Management:
+            - Configuration can be stored in a znode Zc. 
+            - Starting processes obtain their configuration by reading Zc with watch flag set to true.
+            - If config is ever update, processes receive a notification and re-read the configuration again with the watch flag set to true,
+            - Watches ensure that a process has most recent configuration information.
+        - Rendezvous:
+            - It's not often clear in distributed systems what final system configuration might look like. For example: A client may want start a master processs and clients don't know ahead of time the addresses and ports of the master since starting processes is done by a scheduler
+            - We handle this scenario using a Rendezvous Znode Zr created by client. 
+            - When master starts, it feels Zr with the configuration of the master like its addresses and ports. 
+            - When workers start, they re-read Zr with watch flag set to true. It Zr is not updated yet, they get notified when Zr is updated.
+            - Since Zr is an ephemeral node, when client ends master and worker processes can watch for Zr to get deleted and clean themselves when the client ends
+        - Group membership:
+            - Ephemeral nodes allow us to see the state of the session who created the z-node. 
+            - A Znode Zg represents the group. When a process starts, it creates a ephemeral Z-node with the sequential flag set to follow a unique name assignment.
+            - After the child node is created, the process need'nt do anything special. If it ends, the node automatically deleted.
+            - Group information can be easily obtained by listing the children of Zg. To obtain notifications of changes to group information, a process may read the path of Zg with watch flag set to true.
+        - Locks:
+            - The simplest implementation uses "lock files" represented by an ephemeral Z-node. 
+            - A client tries to create an ephemeral znode and acquires the lock. The client reads the znode with watch flag set waiting to be notified if the current leader dies.
+            - Other clients try to acquire the lock once they observe the znode being deleted. 
+            - This suffers from the herd effect. There are many clients who vie for the lock and only one client can acquire it. It only implements exclusive locking.
+        - Simple Locks without herd effect: We line up all clients requesting the lock and each client obtains the lock in order of request arrival
+          Lock procedure
+
+          1. n = create("/lock-", EPHEMERAL|SEQUENTIAL)
+          2. C = getChildren("/lock-", false)
+          3. if n is lowest znode in C:
+          4.   exit;
+          5. p = znode in C ordered just before n
+          6. if exists(p, true)
+          7.   wait for watch event
+          8. goto step 2
+          
+          Unlock procedure
+          delete(n)
+          The sequential flag orders the client's attemp to acquire the lock with respect to all other attempts. If the client's znode is the lowest sequence number in C, it holds the lock. Otherwise, we watch the z-node preceding the client's z-node to avoid the herd effect by only waking up one process once the lock is released or abandoned. This also has no polling or timeouts. 
+        - Read/write locks: The read lock and write lock procedures are separate here.
+            - Write lock:
+            1. n = create(l + "/write", EPHEMERAL | SEQUENTIAL)
+            2. C = getChildren("/write", false)
+            3. if n is lowest node in C exit
+            4. p = znode in C ordered just before n 
+            5. if exists(p, true) wait for event
+            6. go to step 2
+
+            - Read Lock:
+            1. n = create(l + "/read-", EPHEMERAL | SEQUENTIAL)
+            2. C = getChildren(l, false)
+            3. if no write znodes in C ordered just before n, exit
+            4. p = write node in C ordered just before n
+            5. if exists(p, true) wait for event
+            6. go to 3
+
+            - Read locks are shared. 
+            - When a write lock with lowest sequence number gets deleted, several clients that are waiting for a read lock get notified. 
+    - Double Barrier: 
+        - Double barrier helps to sync the beginning and end of a computation. 
+        - When enough processes defined by barrier threshold join the barrier, processes start their computation and leave the barrier once they have finished.
+        - Every process p registers with b which is a barrier znode by creating a child. 
+        - Processes can enter the barrier when the number of children of b exceeds the barrier threshold. 
+        - Processes can leave the barrier when all of the processes have removed their children.
+        - Watches can be used to efficiently wait for enter and exit conditions.
+
+4. Zookeeper Applications:
+    - Fetching service: 
+        - Is a part of the Yahoo Web crawler.
+        - It has master processes commanding page fetching processes.
+        - Master provides configurations to fetchers and fetchers write their statuses to master and health.
+        - Main advantages of using Zookeeper for FS: Recovering from master failures, guanrantee availaibility despite failures, decouple clients from servrs and redirect their requests only to healthy servers.
+    - Katta:
+        - Distributed indexer using Zookeeper for coordination. 
+        - Katta divides the work of indexing using shards. 
+        - Master assigns shards to slaves and track progress.
+        - Slaves can fail so master redistributes load as slaves come by and go. 
+        - Zookeeper is used to track the status of slave servers and the master, handle master failover and group membership. It also tracks the assignment of shards to slaves.
+    
+    - Yahoo Message Broker:
+        - Distributed publish-subscribe system, manages thousands of topics that the clients can publish messages to and receive messages from. 
+        - Each topic is replicated to two machines (primary copy - backup copy) to ensure reliable message delivery. 
+        - YMB uses Zookeeper to manage the distribution of topics, deal with failures of machines in the system, group membership. 
+        - Each broker domain has an ephemeral znode for each of the active servers that compose the YMB service. Each node corresponding to the active server has load and status information. 
+        - The topics znode has a child node for each topic managed by YMB along with its primary and backup replicas.  These manage leader election, discovery of servers incharge of a topic along with leader election.
+
+4. Zookeeper implementation:
+    - Zookeeper provides availaibility by replicating data on each server.
+                                                                    txn              
+-----Write Request ----> Request Processor ----> Atomic Broadcast  ----> Replicated Database ---> Reads
+    - Upon receiving a request, the request processor prepares it for execution. Should it require coordination among servers (write request), an atomic broadcast protocol is used (Zab) and finally servers commit changes to the Zookeeper database that's fully replicated across each Zookeeper node. 
+    - Read requests are satisfied from local database and don't require coordination.
+    - Replicated database is an in-memory data tree storing at most 1 MB of data per node. For recoverability, updates are logged to disk first and then applied on the in-memory data tree.
+    - A replay log of commited operations is maintained and periodic snapshots of the in-memory data tree are maintained.
+    - Clients connect to exactly one Zookeeper server for their requests. While read requests are processed locally, write requests are processed as a part of an agreement protocol.
+    - Per that protocol, all write requests are forwarded to a leader. The followers receive state changes from the leader on the basis of agreed upon state changes.
+    - Request Processor:
+        - The messaging layer is atomic, so it can be guaranteed that local replicas never diverge. At some point though some servers may have applied additional updates more transactions than others.
+        - When the leader receives a write request, it calculates the state of the system when the write will be applied and transforms it into a transaction capturing this state. This computation is essential because there are several outstanding operations that have'nt yet applied. 
+        - For example: If a client does a conditional set and the version number matches the future version of the z-node, then that service generates a new setDataTxn containing the new data, version number and new timestamps. If not, an errorTxn is generated. 
+        - Transactions are idempotent.
+    - Atomic Broadcast:
+        - Write requests are forwarded to the leader and it executes the request locally and forwards the state changes to other nodes using Zookeeper atomic broadcast protocol.
+        - Quorum is used to decide on a proposal and so Zab and Zookeeper work only when 2F + 1 servers are correct. With 2F + 1, we can tolerate F failures.
+        - To achieve high throughput, Zookeeper tries to keep the request processing pipeline full.
+        - Zab guarantees that changes sent by a leader are sent and received in the same order they were sent and a current leader has received all changes from all previous leaders before it starts sending its own changes.
+        - TCP is used for transport and so message order is taken care of by TCP itself.
+        - The leader is chosen off by Zab itself, so same process that creates transactions proposes them.
+        - WAL log is used to keep track of proposals of the in-memory database so messages are not written twice to disk.
+        - Zab delivers all messages in order during normal operation. It does'nt save message id of each message, so few messages might be redelivered.
+        - Delivery is idempotent, multiple delivery is accepted as long as messages are sent in order. Zookeeper requires Zab to redeliver messages that were delivered since the start of the last snapshot.
+    - Replicated database:
+        - Each replica has a copy of the Zookeeper data tree in-memory. When a replica crashes, it needs to recover this state.
+        - We can't replay all messages since it would be quite long. Zookeeper uses periodic snapshots and only requires to redeliver messages since the start of the last snapshot.
+        - Zookeeper snapshots are fuzzy, in that the state is not locked while taking the snapshot. A DFS scan of the data tree is taken and atomically each z-node's metadata and data are written to disk.
+        - Since resulting fuzzy snapshot may have applied some sub-set of state changes during the generation of the snapshot, the result may not correspond to the state of Zookeeper at any point in time. However, since Zookeeper transactions are idempotent, as long as the changes are applied in order, it does'nt make a difference.
+        - For example, assume that there are two Z-nodes /foo, /goo with versions 3 and 2 with values f1 and g1 respectively
+
+                           /foo(version=1, value=f1), /goo(version=1, value=g1)
+
+        We have started taking snapshot and following sequence of state-change quartet (transaction-type, node, value, version) arrives
+            (SetDataTXN, /foo, f2, 2),
+            (SetDataTXN, /goo, g2, 2),
+            (SetDataTXN, /foo, f3, 3)
+
+        Post applying these changes, the z-nodes have below values and versions
+         /foo(version=3, value=f3), /goo(version=2, value=g2)
+
+        However, the fuzzy snapshot may have recorded below changes 
+         /foo(version=3, value=f3), /goo(version=1, value=g1). 
+
+        If now the server crashes and the state changes are redelivered since the last snapshot, the resulting state will correspond to the state before the crash.
+    - Client-Server interaction
+        - When a server processes a write request, it clears out any notifications relative to any watch related to the update. 
+        - Since servers process writes in order and do not take in any write/read concurrently, this ensures strict succession of notifications.
+        - Only the server that client connects to tracks the notifications for that client.  
+        - A read operation might return a stale value even though that z-node has been updated recently. - Not all applications require the latest value i.e precedence order. The sync primitive executes asynchronously and ordered after all writes by the leader to its local replica.
+        - To read the latest value, the client orders a sync before a read. The sync is not broadcasted but its placed at the end of the queue of requests between the server executing sync and the leader. 
+        - Zookeeper process requests from clients in FIFO order. Heartbeat messages, responses include the last zxid the server has seen. If a client connects to a new server, the server needs to ensure that its copy of Zookeeper data is at least as recent as the client's zxid. If a client's zxid is more recent, the client does'nt establish a session till the server has caught up.
+        - Zookeeper uses timeouts to detect for failures. The leader determines there is a failure if no other server receives anything from a client session within a specified timeout.
+    
+5. Evaluation:
+    - Throughput: 
+        - Read throughput is higher than write throughput because reads don't use the atomic broadcast protocol.
+        - The number of servers in the system affects the workload it can handle and the number of failures.
+        - Write requests go through atomic broadcast protocol which requires some processing. The server must also ensure that writes are logged to non-volatile store before sending acknowledgements to the leader. 
+        - Write throughput can be increased by partioning Zookeeper ensemble into multiple ensembles. Load can be distributed because of relaxed consistency guarantees.
+        - Atomic broadcast protocol does most of the work and lowers the performance of Zookeeper. At maxmimum throughput, it becomes CPU bound.
+        - The focus of Zookeeper has been robustness and correctness.
+        - Lets consider the behavior of the service under failure scenarios
+            - If followers fail and recover quickly, Zookeeper is still able to sustain a high throughput
+            - Leader election algorithm is able to elect a new leader fast enough to prevent throughput from dropping substantially.
+            - Even if followers take more time to recover, Zookeeper is still able to raise throughput once they start processing requests.
+
+6. Related works:
+    - Zookeeper has a goal of providing a service capable of mitigating the problem of coordinating processes across distributed applications. It uses principles from previous coordination systems, fault tolerant systems, distributed file systems and distributed algorithms.
+    - Chubby proposes a system to manage advisory locks for distributed applications. It also has a file-system like interface, uses an agreement protocol to guarantee the consistency of the replicas. Zookeeper is not a lock service, it can be used by clients to implement locks. Zookeeper uses local replicas to serve reads and its consistency model is more relaxed than Chubby. It's client allow to connect to any replica, not just the leader.
+    - Zookeeper works with a wide variety of network topologies relying on TCP connections.
+    - Zookeeper uses a variant of State machine replication for fault tolerance using certain properties of Paxos. WAL is used for data recovery.
+    - Zookeeper is not a distributed lock service but it provides lower level primitives to build higher level lock mechanisms.
+    - Zookeeper resembles a small file system in structure but adds functionality such as ordering guarantees and conditional writes
+
+7. Conclusions:
+    - Zookeeper takes a wait-free approach to coordinating processes in distributed systems 
+    - It achieves a throughput of thousands of read operations per second through using local copies to serve read requests with watches.
+
+
+
+          
