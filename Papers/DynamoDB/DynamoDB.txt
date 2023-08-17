@@ -1,0 +1,275 @@
+DynamoDB
+-------
+
+
+0. Abstract
+-----------
+1. DynamoDB is a NoSQL cloud database service which provides consistent performance at any scale.
+2. It's fundamental properties include consistent performance, availaibility, durability and a seamless serverless experience. The different Amazon systems such as Alexa in 2021 Amazon Prime day shopping event made trillions of API calls to DynamoDB with 89.2 million requests per second with single digit millisecond performance.
+3. The system has dealt with issues related to fairness, traffic imbalance across partitions, monitoring and automated system operations without impacting availaibility or performance.
+
+
+1. Introduction
+----------------
+1. DynamoDB powers multiple high traffic Amazon properties and systems including Alexa, Amazon.com websites and all Amazon fulfillment centeres. These have demanding requirements in terms of performance, reliability, durability, efficiency and scale.
+2. DynamoDB's goal is to complete all requests with single-digit millisecond latency.
+3. A key challenge to Dynamo has been to add more features without impacting operational requirements. 
+4. Dynamo uniquely integrates following 6 fundamental system properties
+    i. Fully managed cloud service:
+        - Applications create tables, read/write data without regard to where that data is stored. 
+        - Handles resource provisioning, backups, patching, recovers from failures, software upgrades. 
+        - Frees developers from managing the hardware, configuring a database cluster and cluster operation management.
+    ii. Multi-tenant architecture:
+        - Stores data of different customers on the same physical machines to ensure high utilization of resources and enables cost savings. 
+        - Tight provisioning, resource reservations, monitored usage provides isolation to different customer workloads.
+    iii. Boundless scale for tables:
+        - Tables grow elastically.
+        - DynamoDB spreads an application's data across more servers as the amount of data storage and throughput demands grow.
+        - Designed to scale the resources dedicated to a table from several servers to many thousands as needed.
+    iv. Predictable Performance:
+        - Simple DynamoDB API of GetItem and PutItem allows it to respond requests with consistent low latency.
+        - For application running in the same AWS region as that of Dynamo will experience on an average millisecond latency for a 1 KB item
+        - Even as tables sizes grow, latencies remain consistently low due to the distributed nature of data placement and request routing.
+        - Automatic partitioning and repartitioning to meet the application's I/O requirements.
+    v. Highly availaible:
+        - Replicates data in several data centers called Availaibility Zones in AWS. 
+        - Customers can also create global tables that are geo-replicated across Regions.
+        - Availaibility SLA of 99.99 for regular tables and 99.999 for geo-replicated tables.
+    vi. Flexible use cases:
+        - Does'nt force developers to use a data model or a consistency level.
+        - Flexible schema with key-value and document data models. 
+        - Strong or eventual consistency while reading.  
+5. furthermore, DynamoDB    
+    i. Adapts to customer's traffic patterns to reshape the physical partioning scheme of the tables.
+    ii. Continous verification of data-at-rest to protect against hardware and software failures
+    iii. Maintains high availaibility.
+    iv. Designing sytems for predictability over absolute efficiency. For example: Caches can help improve performance but do not allow them to hide the work that would be performed in their absense. Always provision the system to handle unexpected.
+
+
+2. History
+-----------
+
+1. DynamoDB's design was influenced by it's predecessor Dynamo. 
+2. Dynamo was created in response to the need of a highly availaible, scalable key-value store for key-value data such as shopping carts. 
+3. Traditional enterprise databases when used by applications lead to scalability bottlenecks such as connection management, operational problems such as schema upgrades and interference between concurrent workloads
+4. Service oriented architecture was thus adopted at Amazon to encapsulate an application's data behind service level-APIs allowing sufficient decoupling to address tasks such as reconfigurations without disturbing clients.
+5. Dynamo though it continued to be the only database at that time which provided reliability at scale, it had operational complexities. It was single tenant, teams had to be responsible for managing their own Dynamo clusters.
+6. Amazon soon launched new services Amazon S3 and SimpleDB. Amazon engineers preferred to use these even though Dynamo was better aligned to the application's needs. 
+7. SimpleDB was a fully managed elastic NoSQL database service providing  multi-datacenter replication, high availaibility without user intervention. 
+8. SimpleDB was successful and powered many applications but tables had a small capacity in terms of storage (10 GB) and request throughput. Unpredictable query read/write latencies was another problem, because all table attributes were indexed an overhead on write. Developers had to divid data between tables to meet their application's throughput requirements.
+9. A better solution would combine the best parts of Dynamo (incremental scalability and Predictable high perfomance) with SimpleDB (administration ease of a cloud service, table-based data model richer than a key-value store). So was born DynamoDB.
+
+
+3. Architecture
+---------------
+1. A DynamoDB table is a collection of items, and each item is identified by a primary key. 
+2. The Primary key has two parts: a partition key and a sort key. The partition key's value is used as an input to an internal hash function.
+3. The output from the hash function and sort key determines where the items will be stored. Multiple items can have same partition key but the sort key values must be different.
+4. DynamoDB supports secondary indexes. A secondary index allows querying of data in the table by an alternate key in addition to queries against the primary key.
+5. GetItem (either by primary key or secondary key), PutItem, DeleteItem, UpdateItem are the 4 main operations supported in DynamoDB.
+6. DynamoDB supports ACID transactions enabling applications to update multiple items while ensuring atomicity, consistency, isolation, durability and performance characteristics of DynamoDB tables. 
+7. The table is divide into multiple partitions to handle the throughput and storage requirements of the table. Each partition hosts a contiguous and disjoint part of the table's key-range. 
+8. Each partition has multiple replicas distributed across multiple availaibility zones for availaibility & durability. Replicas for a partition form a replication group. Replication group uses Multi-Paxos for leader election & consensus. Once elected, a leader can periodically renew its leadership lease and retain its leadership. 
+9. Only the leader replica can serve strongly consistent read requests and can handle writes. Upon receiving a write, the leader of the replication group for the key generates a write-ahead log record and sends it to its peers. A write gets acked when a quorum number of peers write the log record to their write ahead logs. 
+10. DynamoDB supports strongly consistent and eventually consistent reads. Any replica can serve an eventually consistent read.
+11. If the leader of the replication group is failure-detected (considered unhealthy or unavailaible), the peer can propose a new round of election to elect itself as the new leader. The new leader won't serve any writes or consistent reads until the previous leader's lease expires.
+12. A replication group consists of storage replicas that contain the Write Ahead log as well as B-tree that stores the key-value data (Fig: DynamoDB_1.png). 
+13. Log replicas are replicas that just store the recent WAL log entries (Fig: DynamoDB_2.png). They help improve availaibility and durability. They are similar to acceptors in Paxos. Log replicas do not store key-value data.
+14. Some of the core services in DynamoDB are metadata service, request routing service, storage nodes, auto-admin service. (Fig: DynamoDB_3.png)
+15. Metadata service stores the routing information about tables, indexes and replication groups for a given key. The request routing service is responsible for authorizing, authenticating & routing each request to the appropriate server.
+16. Request routers look up routing information from metadata service. 
+17. All DDL requests are routed to the auto-admin service.
+18. The storage service is responsible for storing customer data on a fleet of storage nodes.
+19. Auto-admin service continously monitors the fleet health, scaling of tables, execution of all control plane requests, health of all partitions. For example: If auto-admin service detects a storage node to be unhealthy, it kicks off a recovery process that replaces replicas hosted on that node to bring the system back to a stable state.
+
+
+4. Journey from provisioned to on-demand
+----------------------------------------
+1. An internal abstraction was introduced with DynamoDB to dynamically scale the capacity and perfomance of tables. 
+2. In the original DynamoDB release, customers explicitly specified throughput that a table required in terms of read capacity units (RCUs) and write capacity units (WCUs)
+3. For 1 KB size items, one RCU can perform one strongly consistent read request per second and similarly for 1 KB size items, I WCU can perform one standard write per second.
+4. RCUs and WCUs are called provisioned throughput.
+5. As demands from a table changed, partitions could be split and migrated to allow the table to scale elastically. Partition abstraction is central to the design of DynamoDB. The early version of DynamoDB tightly coupled assignment of capacity and performance to individual partitions and this led to challenges.
+6. Admission control is used by DynamoDB to ensure storage nodes don't become overloaded, avoid interference between co-resident table partitions and enforce throughput limitations requested by customers. Storage nodes independently performed admission control based on the allocations of their locally stored partitions
+7. DynamoDB enforces a cap on maximum throughput allocated to a single partition and ensured that total throughput of all the partitions hosted on a storage node is less than the maximum allowed throughput on that storage node determined by the physical characteristics of its storage drives. 
+8. The throughput allocated to a partitions was adjusted whenever the overall  table's throughput was changed or its partitions were split into child partitions. For example: Assume that a partition can accomodate a maximum provisioned throughput of 1000 WCUs. When a table is created with 3200 WCUs, DynamoDB created 4 partitions each allocated 800 WCUs. If the table's provisioned capacity increased to 6000 WCUs, we can split it into 8 partitions each of 750 WCUs.
+9. The uniform distribution of throughput across partitions is based on the asusmptions that an application uniformly accesses keys in a table and splitting a partition for size equally splits the perfomance.
+10. Application workloads however have non-uniform access patterns over time and key-ranges. When the request rate over a table is non-uniform, splitting a partition can result in the hot portion of the partition having less availaible performance that it did before the partition.
+11. Since throuhgput was allocated statically per partition, these non-uniform workloads occassionally resulted in reads/writes being rejected called throttling even though the total provisioned capacity of the table was sufficient to meet its needs.
+12. Hot dilation problem arose in applications that had traffic constantly going towards few items of their tables. Throughput dilution was common for tables where partitions were split for size. This would cause throughput of the old partition to be equally divided among the new partitions and the per partitition throughput would decrease.
+13 In both the cases, throttling caused application to experience periods of unavailaiblility even though the service behaved as expected. Then the tables were over-provisioned. 
+
+4.1 Improvements to admission control
+-------------------------------------
+1. Hot partitions and throughput dilution stemmed from rigid performance allocation to each partition and dividing that allocation as partitions split. 
+2. DynamoDB introduced two new Improvements to cater these: adaptive capacity & bursting.
+3. Bursting:
+    - Not all allocated partitions used their allocated throughput simulataenously. 
+    - The basic idea behind bursting was to let applications tap into the unused capacity for later bursts of throughput usage for upto 300 seconds and utilized it when the consumed capacity exceeds the provisioned capacity of the partition.
+    - Workload isolation is maintained by ensuring partition could only burst if there was unused capacity at the node level. 
+    - Capacity on the storage node could be managed using two token buckets: two each for the partition (allocated and burst) and one for the node. 
+    - When a read or write request arrived at a storage node, if there were tokens in the partition's allocated bucket and node level bucket, its accepted.
+    - If a partition exhausts all provisioned tokens, requests were allowed to burst only when tokens were availaible both in burst token bucket and node-level token bucket.
+    - Read requests were accepted on the basis of local token buckets.
+    - Write requests using burst capacity required an additional check on the node-level token bucket of other member replicas of the partition.
+4. Adaptive capacity: 
+    - Helps absorb long-living spikes that cannot be absorbed by burst capacity.
+    - Adaptive capacity actively monitors the consumed and provisioned capacity of all partitions, if a table experiences throttling and table level throuhgput is not exceeded, it boosts the allocated throughput using a proportional control algorithm.
+    - If table consumed more than its provisioned capacity, the capacity of the partitions which was receiving the boost would be decreased.
+    - Autoadmin system ensured that partitions receiving boost were relocated to an appropriate node having capacity to serve the increased throughput.
+    - Adaptive capacity helped eliminate over 99.99% throttling due to skewed access pattern.
+
+4.2 Global Admission control:
+----------------------------
+1. Both Adaptive capacity and bursting had their own limitations. 
+    - Bursting was helpful for short-lived spikes and it was dependent on the node having throughput to support bursting.
+    - Adaptive capacity was reactive and kicked in only after throttling was observed.
+2. This meant the application using the table did have brief periods of inactivity. 
+3. The salient takeway from adaptive capacity and bursting was partition level capacity was tighyly coupled to admission control.
+4. DynamoDB realized the benefit of removing admission control from the partition and let the partition burst always while providing workload isolation.
+5. Adaptive capacity was removed in favor of Global Admission Control (GAC). It builds on the same idea of token buckets. 
+6. GAC service tracks the total consumption of the table capacity in terms of tokens. 
+7. A local token bucket is maintained at each request router and it in turn communicates with GAC for replenishing tokens at regular intervals.
+8. GAC maintains an ephemeral state computed on the fly based on client requests. Each GAC server can track one or more token buckets configured independently. 
+9. A request from the application deducts tokens at the request router end. When the request router runs out of tokens, it requests more tokens to the GAC.
+10. GAC uses information provided by the client (request router) to estimate the global consumption of the client and accordingly vends out more tokens for the next time unit of the client's share of tokens.
+11. This ensures that non-uniform workloads that send traffic to a subset of items can use maximum throughput capacity.
+12. The partition-level token buckets were also retained for defence-in-depth.
+
+4.3 Balancing Consumed capacity
+------------------------------
+1. Letting partitions to always burst required DynamoDB to handle burst capacity effectively.
+2. Hosting replicas from multiple tables on a storage node for different customers and having varied traffic patterns involves defining an allocation scheme that determines which replicas could safely co-exist without violating critical properties of availaibility, predictable performance, security and elasticicity
+3. Colocation was more manageable with static partitions which made the allocation scheme simple. In case of provisioned tables without bursting and adapative capacity, allocation scheme involved finding storage nodes that could accomodate a partition based on it's storage capacity.
+4. Partitions were never allowed to take more capacity than their provisioned one. All partitions on a given storage node did not utilize their total capacity at a given instance.
+5. DynamoDB implemented a system to proactively balance the partitions allocated across the storage nodes based on throughput consumption and storage.
+6. Each storage node independently monitors throughput and storage of all its partitions. In case the throughput capacity is beyond the threshold capacity of the node, it reports to the autoadmin service a list of candidate partitions to be moved away from the current node.
+7. The autoadmin helps find a new storage node in a different Availaibility Zone that does'nt have a replica for this partition.
+
+4.4 Splitting for consumption
+-----------------------------
+1. Table might still experience throttling in case of skewed access patterns. 
+2. To address this, DynamoDB automatically scales out partitions based on throughput used.Once the consumed throughput of a partition crosses a certain threshold, the partition becomes availaible for splitting. 
+3. The split point in the key range is chosen on the basis of key distribution the partition has observed. 
+4. There are classes of workloads that don't benefit from splitting. For example: A partition receiving high traffic to a single item or a partition where the key-range is accessed sequentially does'nt benefit from splitting. DynamoDB identifies such patterns and avoids splitting the partition.
+
+4.5 On-demand provisioning
+--------------------------
+1. Customers either over-provisioned or under-provisioned which resulted in low utilization or over utilization. This was because most people migrated to DynamoDB from centralized or self-hosted databases so its serverless model of having read and write capacity units was new to most people.
+2. On-demand tables removed the burden to find out the right provisioning capacity for tables.
+3. DynamoDB provisions the on-demand tables on the basis of reads and writes consumed capacity and instantly allocates double the previous peak traffic on the table.
+4. DynamoDB automatically allocates more capacity as the traffic volume increases as the workload does not experience more throttling. The partition split decision is based on traffic.
+
+5. Durablity and correctness
+-----------------------------
+DynamoDB is designed for durability with the ability to detect, correct and prevent any potential data loss.
+
+5.1 Hardware failures
+---------------------
+1. WAL is central for providing durability and crash recovery. WAL are stored in all 3 replicas of the partition.
+2. WAL are periodically archived to S3 object store that's designed for 11 nines of durability.
+3. Each replica contain the most recent WAL that are waiting to be archived.
+4. When a node goes down, all the replication groups hosted on the node are down to 2 copies. 
+5. The process of healing a storage replica can take up to several minutes because repair process involves copying the B-tree and other write ahead logs stored on the node. 
+6. Upon detecting an unhealthy replica, a leader of a replication group adds a log replica to ensure there is no impact on durability. This takes less time because for a log replica, only the most recent WAL is to be copied.
+
+5.2 Silent data errors
+----------------------
+1. DynamoDB makes extensive use of checksums to detect silent errors.
+2. Checksums are maintained for integrity within every log, message and data file, DynamoDB validates checksums for every data transfer between two nodes.
+3. Every log file archived to S3 has information contained in a manifest about the log: it's start and end markers, table and partition. 
+4. The log archival agent performs various checks before uploading a file to S3. 
+    - Each entry is verified to be from correct table and partition
+    - Checksum verification
+    - Checking for any holes/gaps in sequence numbers.
+5. Every log and manifest file are transferred to S3 with a checksum. This is to verify any errors during transit to S3.
+
+5.3 Continous verification
+--------------------------
+1. DynamoDB continously verifies data at rest through a process called scrubbing.
+2. The scrub process verifies that  
+    - All the 3 copies of data in a replication group are same
+    - Data of the live replica matches with the data of a replica built offline from archived WALs from S3.
+3. Scrubbing acts as a defense in depth to detect divergences between the live storage replicas with the replicas built using the history of logs from the inception of the table.
+
+5.4 Backups and restores
+-----------------------
+1. Backups and restores don't affect performance or availaibility since they are built using archived logs in S3.
+2. They are consistent to the nearest second.
+3. DynamoDB also supports point-in-time restore. Customers can restore contents of a table that existed at any time over previous 35 days using point-in-time restore.
+4. For tables with point-in-time restore enabled, partitions of the table are periodically snapshotted to S3. The periodicity is determined on the basis of the amount of write-ahead logs accumulated for the partition.
+5. When point in time snapshot is enabled for a table, DynamoDB identifies the closest snapshot to the requested time for all partitions of the table, applies the logs upto the timestamp in the restore request and creates a snapshot of the table and restores it.
+
+
+6. Availaibility
+-----------------
+1. To achieve availaibility, DynamoDB tables are replicated across multiple Availaibility Zones (AZs) in a region.
+2. It regularly tests resilience to node rack and AZ failures using power-off tests.
+
+
+6.1 Write and read consistent availaibility
+-------------------------------------------
+1. A partition's write availaibility depends on its ability to have a healthy leader and a healthy write quorum. Healthy write quorum consists of 2 out of 3 replicas from different AZs. 
+2. A partition will become unavailaible for writes if the number of replicas to achieve minimum quorum are not availaible. 
+3. If one of the replicas is unavailaible, the leader adds a log replica to the group. It's the fastest way to ensure write quorum is always met. 
+4. eventually consistent reads can be served by any replicas.
+5. In case a leader replica fails, other leaders detect its failure and elect a new leader to minimize disruptions to the availaibility of consistent reads.
+
+6.2 Failure Detection
+---------------------
+1. A newly elected leader has to wait for the expiry of the old leader's lease before serving any traffic. Till this happens, the old leader cannot accept any new writes or consistent read traffic during that period. 
+2. Failure detection of the leader should be quick and robust and free from false positives since it impacts availaibility.
+3. Failure detection becomes difficult in case of gray network because of communication issues between a leader and a follower
+4. To solve availaibility problems caused by gray failures, a follower wanting to trigger a failover sends a message to all followers asking if they can communicate with the leader. If replicas respond with a healthy leader message, the follower drops its attempt.
+5. This change in failure detection algorithm has minimized the number of spurious leader elections.
+
+6.3 Measuring Availaibility
+---------------------------
+1. DynamoDB is designed for 99.9999 availaibility for global tables and 99.99 percent availaibility for regional tables.
+2. Availaibility is calculated for each 5-minute interval as the percentage of Dynamo requests that succeed. 
+3. DynamoDB continously monitors availaibility at table & service levels.
+4. Tracked availaibility trends data is analyzed and alarms are triggered if customers see errors above a threshold. 
+5. These alarms called customer-facing-alarms report availaibility related problems and proactively attempt to correct them or through operator intervention.
+6. In addition to real-time tracking, the system runs daily jobs that trigger aggregation to calculate aggregate metrics per customer.
+
+6.4 Deployments
+---------------
+1. DynamoDB takes care of deployments without need for maintained windows, without affecting availaibility and perfomance.
+2. It's not just the end state and start state that matter, sometimes the deployments have to be rolled back.
+3. DynamoDB runs a suite of upgrade and  downgrade tests at a component level before every deployment.
+4. The deployments in a distributed system are not atomic, at times there is old code and new code running on different nodes in the system. Also the new code might change the protocol in a way, the old code does'nt understand.
+5. Read-write deployment is used to handle these issues. The first step is to deploy software using the new protocol format. Once all nodes handle the new format, then the deployment is upgraded on other nodes.
+6. DynamoDB sets alarm thresholds on availaibility metrics. If error rates or latencies exceed during deployments, automatic rollbacks are triggered. 
+
+6.5 Handling external dependencies
+------------------------------------
+1. All services on which DynamoDB depends on should maintain availaibility thats higher than DynamoDB's to maintain SLAs. DynamoDB must also learn to operate assuming these services might go down.
+2. DynamoDB depends on AWS Identity and Access Management (IAM) to authenticate customer requests and AWS Key management service (AWS KMS) that takes care of table encryption using customer keys.
+3. DynamoDB caches results from IAM and AWS KMS in the request routers that perform the authentication of each request. These results are periodically refreshed asyncly. 
+4. Clients that send requests to request routers that don't have cached results would see an impact. 
+
+6.6 Metadata availaibility
+--------------------------
+1. The mapping between the primary keys and storage nodes is one of the most important pieces of metadata the request routers need. 
+2. This information consists of partition information of each table, the key-range of each partition and the storage nodes where each partition is hosted. 
+3. When a router gets a request which it has not seen previously, it downloads the routing information from DynamoDB and caches it. The cache hit ratio is 99.75% because partition information rarely changes.
+4. In case of a cold start where the router caches are empty, DynamoDB request would result in a metadata lookup, and so the service had to scale to serve requests at the same rate as DynamoDB. Thus introducing new request routers would impact performance and make the system unstable. Same effect with a bad cache.
+5. DynamoDB wanted to reduce the impact of local cache for request routers and other metadata clients without impacting the latency of requests.
+6. While serving a request, the router only needs information about the partition and the storage need containing the particular data. It's wasteful to get the routing information for the entire table. For this purpose, DynamoDB designers built MemDS
+7. It stores all the metadata in memory and replicates it across the
+MemDS fleet. MemDS scales horizontally to handle the entire incoming request rate of DynamoDB.
+8. The MemDS process on a node encapsulates a Perkle tree: hybrid of a Patricia tree and Merkle tree. 
+    - It allows keys and associated values to be looked up on the basis of either the full key or key prefix. 
+    - Since keys are stored sorted, all range operations are also supported.
+    - Two special operations do as per their names, floor and ceiling.
+9. A new partition map cache was deployed on each request router host to avoid the bi-modality of the original request router cache.
+10. A cache hit also results in refreshing the router cache through an asynchronous call to MemDS. Thus, the new cache ensures the MemDS fleet is always serving a constant volume of traffic regardless of cache hit ratio.
+11. The constant traffic to the MemDS fleet increases the load on the
+metadata fleet compared to the conventional caches where the traffic to the backend is determined by cache hit ratio, but prevents cascading failures to other parts of the system.
+12. If the partition membership provided by MemDS is stale, then the
+incorrectly contacted storage node either responds with the latest membership if known or responds with an error code.
+
+7. Micro-benchmarks
+-------------------
+1. DynamoDB read latencies show very little variance and remain identical even as the throughput of the workload is increased.
+2. Write latencies too remain constant no matter the throuhgput of the workload.
