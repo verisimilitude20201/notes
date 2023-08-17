@@ -45,7 +45,7 @@ Zookeeper
         - Zookeeper's data model is a hierarchically organized set of z-nodes which is simply a a hierarchically key-value table where the keys are hierarchical
         - Different applications can allocate their nodes under different sub-trees with different access rights.
         - Z-nodes map to abstractions of the client application and ususally used to store data required to be used for configuration and coordination.
-        - For example: We can have a simple Z-node called app1 whose children P1, P2, P3 implement a group membership protocol referring to processes within the group. If a process terminates, the group is deleted.
+        - For example: We can have a simple Z-node called app1 whose children P1, P2, P3 implement a group membership protocol referring to processes within the group. If a process terminates, the Z-node of it is deleted.
         - Z-nodes have timestamps and version counters which allows clients to track changes to the node and execute condition updates based on the Z-node's version.
     - Sessions:
         - Session is created when a client connects to one of the Zookeeper servers within the Zookeeper ensemble. 
@@ -88,7 +88,7 @@ Zookeeper
         - Rendezvous:
             - It's not often clear in distributed systems what final system configuration might look like. For example: A client may want start a master processs and clients don't know ahead of time the addresses and ports of the master since starting processes is done by a scheduler
             - We handle this scenario using a Rendezvous Znode Zr created by client. 
-            - When master starts, it feels Zr with the configuration of the master like its addresses and ports. 
+            - When master starts, it feeds Zr with the configuration of the master like its addresses and ports. 
             - When workers start, they re-read Zr with watch flag set to true. It Zr is not updated yet, they get notified when Zr is updated.
             - Since Zr is an ephemeral node, when client ends master and worker processes can watch for Zr to get deleted and clean themselves when the client ends
         - Group membership:
@@ -148,7 +148,7 @@ Zookeeper
         - Is a part of the Yahoo Web crawler.
         - It has master processes commanding page fetching processes.
         - Master provides configurations to fetchers and fetchers write their statuses to master and health.
-        - Main advantages of using Zookeeper for FS: Recovering from master failures, guanrantee availaibility despite failures, decouple clients from servrs and redirect their requests only to healthy servers.
+        - Main advantages of using Zookeeper for FS: Recovering from master failures, guarantee availaibility despite failures, decouple clients from servers and redirect their requests only to healthy servers.
     - Katta:
         - Distributed indexer using Zookeeper for coordination. 
         - Katta divides the work of indexing using shards. 
